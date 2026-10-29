@@ -131,23 +131,14 @@ class HerAIPredictor:
         else:
             self.model = model_pipeline
 
-    def predict(
+    def build_feature_row(
         self,
         profile: UserProfileInput,
         current_cycle: CurrentCycleInput,
         historical_cycle: Optional[HistoricalCycleInput] = None,
-    ) -> PredictionOutput:
-        """Run ethical prediction without borrowing stranger data."""
-        # Validate inputs
-        profile.validate()
-        current_cycle.validate()
-        if historical_cycle:
-            historical_cycle.validate()
-
-        warnings: List[str] = []
+    ) -> pd.DataFrame:
+        """Construct a validated 1-row DataFrame aligned with FEATURES_37."""
         has_history = historical_cycle is not None
-
-        # Build feature row exactly matching FEATURES_37 schema
         feature_dict: Dict[str, Any] = {
             # User profile
             "state": profile.state,
@@ -218,6 +209,27 @@ class HerAIPredictor:
                 historical_cycle.previous_pms_symptoms if has_history else "Unknown"
             ),
         }
+        return pd.DataFrame([feature_dict])[FEATURES_37]
+
+    def predict(
+        self,
+        profile: UserProfileInput,
+        current_cycle: CurrentCycleInput,
+        historical_cycle: Optional[HistoricalCycleInput] = None,
+    ) -> PredictionOutput:
+        """Run ethical prediction without borrowing stranger data."""
+        # Validate inputs
+        profile.validate()
+        current_cycle.validate()
+        if historical_cycle:
+            historical_cycle.validate()
+
+        warnings: List[str] = []
+        has_history = historical_cycle is not None
+
+        # Build feature row exactly matching FEATURES_37 schema
+        input_df = self.build_feature_row(profile, current_cycle, historical_cycle)
+        feature_dict = input_df.iloc[0].to_dict()
 
         if not has_history:
             warnings.append(

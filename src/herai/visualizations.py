@@ -304,6 +304,9 @@ def create_cycle_length_distribution_chart(cycle_lengths: pd.Series) -> go.Figur
 
 def create_user_trajectory_chart(period_df: pd.DataFrame, user_id: str) -> go.Figure:
     """Plot multi-cycle trajectory for a specific patient cohort record."""
+    if period_df.empty or "user_id" not in period_df.columns or "cycle_number" not in period_df.columns:
+        return go.Figure()
+
     user_records = period_df[period_df["user_id"] == user_id].sort_values("cycle_number").copy()
     if user_records.empty:
         return go.Figure()

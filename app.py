@@ -223,13 +223,34 @@ st.markdown("""
         border-radius: 8px;
         padding: 10px 22px;
         font-size: 0.96rem;
+        min-height: 42px;
         box-shadow: 0 2px 8px rgba(185, 123, 138, 0.28);
         transition: all 0.2s ease;
+        cursor: pointer;
     }
     .stButton>button:hover {
         background: #A26876;
         color: var(--color-white);
         box-shadow: 0 4px 12px rgba(185, 123, 138, 0.36);
+        transform: translateY(-1px);
+    }
+    .stButton>button:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 4px rgba(185, 123, 138, 0.2);
+    }
+    .stButton>button:focus-visible {
+        outline: 3px solid var(--color-mauve) !important;
+        outline-offset: 2px !important;
+    }
+
+    /* Accessible focus states for radio and inputs */
+    .stRadio div[role="radiogroup"] label:focus-within {
+        outline: 2px solid var(--color-mauve) !important;
+        border-radius: 4px !important;
+    }
+    input:focus-visible, select:focus-visible, textarea:focus-visible {
+        border-color: var(--color-mauve) !important;
+        outline: 2px solid var(--color-dusty-rose) !important;
     }
 
     /* Callout & Disclaimer */
@@ -281,14 +302,77 @@ st.markdown("""
         line-height: 1.5;
     }
 
-    /* Empty state */
+    /* Empty state card */
     .empty-state-card {
         background: var(--color-white);
-        border: 1px dashed var(--color-border);
+        border: 1.5px dashed var(--color-border);
         border-radius: 12px;
-        padding: 30px;
+        padding: 32px 24px;
         text-align: center;
         color: #7A6560;
+        margin: 16px 0;
+        transition: border-color 0.2s ease;
+    }
+    .empty-state-card:hover {
+        border-color: var(--color-mauve);
+        background: #FAF7F5;
+    }
+
+    /* Responsive Breakpoints: Tablet & Mobile */
+    @media (max-width: 768px) {
+        .main .block-container {
+            padding-top: 0.6rem !important;
+            padding-left: 0.8rem !important;
+            padding-right: 0.8rem !important;
+        }
+        .hero-banner {
+            padding: 18px 16px !important;
+            border-radius: 10px !important;
+        }
+        .hero-headline {
+            font-size: 1.55rem !important;
+        }
+        .hero-subtext {
+            font-size: 0.90rem !important;
+            margin-bottom: 12px !important;
+        }
+        h1 { font-size: 1.65rem !important; }
+        h2 { font-size: 1.35rem !important; }
+        h3 { font-size: 1.12rem !important; }
+        .metric-stat-box {
+            padding: 12px 14px !important;
+            margin-bottom: 8px !important;
+        }
+        .metric-stat-value {
+            font-size: 1.45rem !important;
+        }
+        .card-surface {
+            padding: 14px 16px !important;
+            border-radius: 10px !important;
+        }
+        .score-result-banner {
+            padding: 16px 18px !important;
+        }
+        .score-result-title {
+            font-size: 1.35rem !important;
+        }
+        .stRadio div[role="radiogroup"] {
+            flex-wrap: wrap !important;
+            gap: 6px !important;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .hero-headline {
+            font-size: 1.35rem !important;
+        }
+        .metric-stat-value {
+            font-size: 1.25rem !important;
+        }
+        .stButton>button {
+            width: 100% !important;
+            min-height: 44px !important;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -488,7 +572,7 @@ def render_health_prediction(predictor: HerAIPredictor):
     pr_col1, pr_col2 = st.columns([2, 3], vertical_alignment="center")
     with pr_col1:
         preset = st.selectbox(
-            "Preload Observational Scenario:",
+            "Preload Observational Scenario (Demo Presets):",
             [
                 "Custom Inputs",
                 "🌸 Balanced & Regular Cycle (Optimal Range)",
@@ -497,13 +581,13 @@ def render_health_prediction(predictor: HerAIPredictor):
                 "🌿 Longer Cycle with Mild Symptoms"
             ],
             index=0,
-            help="Select a scenario to populate representative observational parameters."
+            help="Select a scenario to populate representative observational parameters for quick evaluation."
         )
     with pr_col2:
         st.markdown("""
         <div class="callout-lavender" style="margin: 0;">
-            <b>Privacy & Integrity Guarantee:</b> Input values are processed strictly in-memory during your session. 
-            No records from other individuals are substituted to generate your prediction.
+            <b>Privacy & Integrity Guarantee:</b> Demo presets populate representative observational values for demonstration. 
+            All health scores are calculated live by the validated 37-feature Ridge model—no stranger records or fabricated outputs are substituted.
         </div>
         """, unsafe_allow_html=True)
 
@@ -649,9 +733,17 @@ def render_health_prediction(predictor: HerAIPredictor):
 
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # Prediction Action Button
+    # Action Buttons: Predict and Reset
     st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
-    btn_predict = st.button("Generate Health Score Prediction", use_container_width=True, key="btn_run_prediction")
+    btn_col1, btn_col2 = st.columns([3, 1], vertical_alignment="center")
+    with btn_col1:
+        btn_predict = st.button("Generate Health Score Prediction", use_container_width=True, key="btn_run_prediction")
+    with btn_col2:
+        btn_reset = st.button("Reset Form", use_container_width=True, key="btn_reset_prediction_form")
+        if btn_reset:
+            st.session_state.last_prediction = None
+            st.session_state.last_inputs = None
+            st.rerun()
 
     if btn_predict or preset != "Custom Inputs":
         try:
@@ -706,6 +798,20 @@ def render_health_prediction(predictor: HerAIPredictor):
     # E. Prediction Results Section
     if st.session_state.last_prediction is not None:
         render_prediction_results(st.session_state.last_prediction, st.session_state.last_inputs)
+    else:
+        st.markdown("<hr style='margin: 30px 0 20px 0; border: none; border-top: 1px solid #F0E2DA;'>", unsafe_allow_html=True)
+        st.markdown("""
+        <div class="empty-state-card">
+            <div style="font-size: 2.2rem; margin-bottom: 8px;">🌸</div>
+            <div style="font-family: var(--font-serif); font-size: 1.25rem; color: #59433F; margin-bottom: 6px;">
+                Ready to Generate Your Forecast
+            </div>
+            <div style="font-size: 0.88rem; max-width: 520px; margin: 0 auto; line-height: 1.5; color: #7A6560;">
+                Review the cycle observations, lifestyle parameters, and history settings above, 
+                then click <b>Generate Health Score Prediction</b> to view your next-cycle score and multidimensional wellbeing radar.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
 
 # =============================================================================
