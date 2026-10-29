@@ -1,4 +1,26 @@
+# Python & virtual environment
 .venv/
+venv/
+env/
 __pycache__/
 *.py[cod]
+*$py.class
+
+# Testing & quality
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs & temp
+*.log
+*.tmp
+*.bak
+
+# Environment secrets & config
 .env
+.env.*
+.streamlit/secrets.toml
+
+# OS artifacts
+.DS_Store
+Thumbs.db

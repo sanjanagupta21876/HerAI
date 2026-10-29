@@ -654,47 +654,54 @@ def render_health_prediction(predictor: HerAIPredictor):
     btn_predict = st.button("Generate Health Score Prediction", use_container_width=True, key="btn_run_prediction")
 
     if btn_predict or preset != "Custom Inputs":
-        profile_obj = UserProfileInput(
-            age=float(age),
-            bmi=float(bmi),
-            sleep_hours=float(base_sleep),
-            stress_score_baseline=float(base_stress),
-            state=state_region,
-            diet_quality=diet_quality,
-            exercise_frequency=exercise_freq,
-            caffeine_intake=float(caffeine_intake),
-            water_intake_liters=float(water_intake),
-            alcohol_consumption=alcohol_stat,
-            smoking_status=smoking_stat,
-            birth_control_use=1 if bc_obs else 0,
-            pcos_diagnosed=1 if pcos_obs else 0,
-        )
+        try:
+            profile_obj = UserProfileInput(
+                age=float(age),
+                bmi=float(bmi),
+                sleep_hours=float(base_sleep),
+                stress_score_baseline=float(base_stress),
+                state=state_region,
+                diet_quality=diet_quality,
+                exercise_frequency=exercise_freq,
+                caffeine_intake=float(caffeine_intake),
+                water_intake_liters=float(water_intake),
+                alcohol_consumption=alcohol_stat,
+                smoking_status=smoking_stat,
+                birth_control_use=1 if bc_obs else 0,
+                pcos_diagnosed=1 if pcos_obs else 0,
+            )
 
-        cycle_obj = CurrentCycleInput(
-            cycle_length_days=float(cycle_length),
-            pain_level=float(pain_score),
-            mood_score=float(mood_score),
-            stress_score_cycle=float(cycle_stress),
-            sleep_hours_cycle=float(cycle_sleep),
-            energy_level=float(energy_score),
-            concentration_score=float(focus_score),
-            work_hours_lost=float(hours_lost),
-            cycle_phase=cycle_phase,
-            flow_level=flow_level,
-            pms_symptoms="Moderate" if pain_score > 5 else "Mild"
-        )
+            cycle_obj = CurrentCycleInput(
+                cycle_length_days=float(cycle_length),
+                pain_level=float(pain_score),
+                mood_score=float(mood_score),
+                stress_score_cycle=float(cycle_stress),
+                sleep_hours_cycle=float(cycle_sleep),
+                energy_level=float(energy_score),
+                concentration_score=float(focus_score),
+                work_hours_lost=float(hours_lost),
+                cycle_phase=cycle_phase,
+                flow_level=flow_level,
+                pms_symptoms="Moderate" if pain_score > 5 else "Mild"
+            )
 
-        with st.spinner("Executing 37-feature preprocessing and Ridge regression model..."):
-            pred_result = predictor.predict(profile_obj, cycle_obj, historical_cycle=hist_input)
+            with st.spinner("Executing 37-feature preprocessing and Ridge regression model..."):
+                pred_result = predictor.predict(profile_obj, cycle_obj, historical_cycle=hist_input)
 
-        st.session_state.last_prediction = pred_result
-        st.session_state.last_inputs = {
-            "age": age, "bmi": bmi, "base_stress": base_stress, "base_sleep": base_sleep,
-            "cycle_length": cycle_length, "phase": cycle_phase, "flow": flow_level,
-            "pain": pain_score, "mood": mood_score, "cycle_stress": cycle_stress,
-            "cycle_sleep": cycle_sleep, "energy": energy_score, "focus": focus_score,
-            "hours_lost": hours_lost, "has_history": has_history
-        }
+            st.session_state.last_prediction = pred_result
+            st.session_state.last_inputs = {
+                "age": age, "bmi": bmi, "base_stress": base_stress, "base_sleep": base_sleep,
+                "cycle_length": cycle_length, "phase": cycle_phase, "flow": flow_level,
+                "pain": pain_score, "mood": mood_score, "cycle_stress": cycle_stress,
+                "cycle_sleep": cycle_sleep, "energy": energy_score, "focus": focus_score,
+                "hours_lost": hours_lost, "has_history": has_history
+            }
+        except InputValidationError as err:
+            st.error(f"Input Validation: {err}")
+            st.session_state.last_prediction = None
+        except Exception:
+            st.error("An unexpected error occurred during prediction. Please verify your inputs and try again.")
+            st.session_state.last_prediction = None
 
     # E. Prediction Results Section
     if st.session_state.last_prediction is not None:
