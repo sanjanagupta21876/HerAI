@@ -4,7 +4,7 @@
 
 HERAI is a machine learning system designed to predict a user's next-cycle overall health score using menstrual-cycle observations, demographic and lifestyle factors, and prior-cycle health data.
 
-The project demonstrates end-to-end data validation, feature engineering, regression model training, model comparison, privacy-preserving inference, and automated testing.
+The project features a **professional, interactive web application** alongside an end-to-end data pipeline, feature engineering, regression model training, model comparison, privacy-preserving inference, and automated testing.
 
 **Note:** HERAI is an educational prototype and is not a medically validated diagnostic or clinical decision-making system.
 
@@ -17,6 +17,7 @@ The project demonstrates end-to-end data validation, feature engineering, regres
 - Engineer chronological lag features and align next-cycle prediction targets.
 - Train and compare regression models (Ridge Regression, Random Forest).
 - Provide a privacy-preserving inference engine that predicts next-cycle health using **only** user-owned data and learned population baseline defaults (without borrowing stranger records).
+- Deliver an interactive, clinical-grade Streamlit web interface with real-time score gauges, wellbeing radar profiles, cohort analytics, and holistic care guidance.
 - Deliver automated unit and integration tests with `pytest`.
 
 ---
@@ -25,6 +26,7 @@ The project demonstrates end-to-end data validation, feature engineering, regres
 
 - **Language:** Python (3.9+)
 - **Core Libraries:** Pandas, NumPy, Scikit-learn, Joblib, Pydantic
+- **Web UI & Visualization:** Streamlit (1.58.0+), Plotly (6.8.0+)
 - **Testing:** Pytest
 - **Data Storage:** Validated CSV files
 - **Selected Model:** 37-feature Ridge Regression Pipeline
@@ -35,6 +37,7 @@ The project demonstrates end-to-end data validation, feature engineering, regres
 
 ```text
 HERAI/
+├── app.py                          # Streamlit web application & clinical dashboard
 ├── data/
 │   ├── raw/
 │   │   ├── Period_Log.csv          # 17,976 raw menstrual cycle records
@@ -52,7 +55,8 @@ HERAI/
 │   │   ├── config.py               # Paths, feature sets, validation bounds
 │   │   ├── data.py                 # Schema validation, merging, lag generation
 │   │   ├── models.py               # Pipelines, user-grouped splitting, evaluation
-│   │   └── inference.py            # Ethical inference engine & input validation
+│   │   ├── inference.py            # Ethical inference engine & input validation
+│   │   └── visualizations.py       # Plotly charts (gauge, radar, cohort, trajectory)
 │   ├── 01_inspect_data.py          # Exploratory data analysis & health score formula audit
 │   ├── 02_merge_data.py            # Schema validation and dataset merge
 │   ├── 03_create_features.py       # Chronological sort and lag feature creation
@@ -66,7 +70,8 @@ HERAI/
 │   └── src/
 │       └── 06_compare_models.py    # Backward-compatibility forwarding stub
 ├── tests/
-│   └── test_herai.py               # Automated pytest suite
+│   ├── test_herai.py               # Core ML pipeline & inference unit tests
+│   └── test_ui.py                  # Visualization & UI component unit tests
 ├── pyproject.toml                  # Package configuration & pytest settings
 ├── requirements.txt                # Dependency manifest
 └── README.md
@@ -111,7 +116,22 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-### 7.2 Run the Pipeline
+### 7.2 Launch the Interactive Web Application
+
+Start the Streamlit application:
+
+```bash
+streamlit run app.py
+```
+
+Features included in the web application:
+- **Interactive Cycle Consultation:** Instant score prediction with radial gauge meter, wellbeing radar profile, and tailored clinical suggestions.
+- **Quick-Load Clinical Presets:** One-click preloading of realistic scenarios (Balanced Cycle, High Stress, Dysmenorrhea/Pain, PCOS pattern).
+- **Cohort & Longitudinal Explorer:** Interactive population score distribution and multi-cycle patient trajectory graphs.
+- **Model Architecture & Audit:** Live benchmarking metrics, standardized Ridge driver weights, and leakage audit proofs.
+- **Holistic Care Guide:** Comprehensive overview of the 4 menstrual phases, nutritional recommendations, and clinical red-flag symptoms.
+
+### 7.3 Run the ML Training Pipeline (Optional Rebuild)
 
 Execute the pipeline in sequential order:
 
@@ -140,11 +160,11 @@ python src/06_compare_models.py
 # 8. Run prediction on sample data
 python src/06_predict.py
 
-# 9. Run interactive personalized user prediction
+# 9. Run interactive personalized user prediction (CLI)
 python src/07_user_input.py
 ```
 
-### 7.3 Run Automated Tests
+### 7.4 Run Automated Tests
 
 Execute the full test suite with:
 
