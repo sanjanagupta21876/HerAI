@@ -5,24 +5,30 @@ import pytest
 import plotly.graph_objects as go
 
 from herai.visualizations import (
+    create_cycle_wave_hero,
     create_gauge_chart,
     create_radar_chart,
     create_cohort_distribution_chart,
+    create_cycle_length_distribution_chart,
     create_user_trajectory_chart,
     create_feature_importance_chart,
 )
 
 
+def test_cycle_wave_hero():
+    """Verify cycle wave hero chart generates a clean Plotly figure."""
+    fig = create_cycle_wave_hero()
+    assert isinstance(fig, go.Figure)
+    assert len(fig.data) == 2  # curve line + milestone markers
+
+
 def test_gauge_chart_generation():
-    """Verify gauge chart generates correctly across optimal, moderate, and sub-optimal scores."""
-    fig_opt = create_gauge_chart(8.8, "Optimal")
+    """Verify gauge chart generates on continuous 0-10 scale with cohort median."""
+    fig_opt = create_gauge_chart(8.8, "+0.20 relative to median")
     assert isinstance(fig_opt, go.Figure)
 
-    fig_mod = create_gauge_chart(7.2, "Moderate")
+    fig_mod = create_gauge_chart(7.2, "-1.40 relative to median")
     assert isinstance(fig_mod, go.Figure)
-
-    fig_sub = create_gauge_chart(5.1, "Sub-optimal")
-    assert isinstance(fig_sub, go.Figure)
 
 
 def test_radar_chart_generation():
@@ -53,12 +59,19 @@ def test_radar_chart_generation():
     assert len(fig_dual.data) == 2
 
 
-def test_cohort_and_trajectory_charts():
-    """Verify cohort distribution and multi-cycle patient trajectory charts."""
+def test_cohort_and_cycle_length_distribution():
+    """Verify cohort distribution and cycle length histogram charts."""
     sample_scores = pd.Series([7.5, 8.2, 9.1, 6.4, 8.8, 9.5])
     fig_cohort = create_cohort_distribution_chart(sample_scores, user_score=8.5)
     assert isinstance(fig_cohort, go.Figure)
 
+    sample_lengths = pd.Series([26, 27, 28, 28, 29, 30, 31])
+    fig_len = create_cycle_length_distribution_chart(sample_lengths)
+    assert isinstance(fig_len, go.Figure)
+
+
+def test_user_trajectory_chart():
+    """Verify longitudinal trajectory chart."""
     toy_period_df = pd.DataFrame({
         "user_id": ["U001", "U001", "U001"],
         "cycle_number": [1, 2, 3],
@@ -76,4 +89,3 @@ def test_feature_importance_chart():
     coefs = [-0.35, -0.65, 0.12]
     fig = create_feature_importance_chart(names, coefs, top_n=3)
     assert isinstance(fig, go.Figure)
-

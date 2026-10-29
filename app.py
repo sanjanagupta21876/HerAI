@@ -9,7 +9,7 @@ from pathlib import Path
 import streamlit as st
 import pandas as pd
 import numpy as np
-from typing import Optional
+from typing import Optional, Dict, Any
 
 # Ensure project src is in sys.path
 ROOT = Path(__file__).resolve().parent
@@ -29,9 +29,11 @@ from herai.inference import (
     InputValidationError,
 )
 from herai.visualizations import (
+    create_cycle_wave_hero,
     create_gauge_chart,
     create_radar_chart,
     create_cohort_distribution_chart,
+    create_cycle_length_distribution_chart,
     create_user_trajectory_chart,
     create_feature_importance_chart,
     PALETTE,
@@ -45,12 +47,21 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Phase 3 Visual Design System: Custom CSS
+# Initialize navigation state
+if "current_page" not in st.session_state:
+    st.session_state.current_page = "Dashboard"
+
+if "last_prediction" not in st.session_state:
+    st.session_state.last_prediction = None
+
+if "last_inputs" not in st.session_state:
+    st.session_state.last_inputs = None
+
+# Custom CSS for Phase 3 Visual Design System & Phase 4 Layout
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700&family=DM+Sans:wght@400;500;600&display=swap');
 
-    /* Global Root Variables */
     :root {
         --color-ivory: #FFF9F5;
         --color-peach: #F8E5DB;
@@ -66,7 +77,6 @@ st.markdown("""
         --font-sans: 'Inter', 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     }
 
-    /* Overall Page Background & Typography */
     .stApp {
         background-color: var(--color-ivory);
         color: var(--color-cocoa);
@@ -74,85 +84,93 @@ st.markdown("""
     }
 
     .main .block-container {
-        padding-top: 1.6rem;
+        padding-top: 1.2rem;
         padding-bottom: 3.5rem;
         max-width: 1200px;
     }
 
-    /* Typography Hierarchy */
+    /* Headings */
     h1, h2, h3, .serif-heading {
         font-family: var(--font-serif);
         color: var(--color-cocoa);
         font-weight: 400;
         letter-spacing: -0.01em;
     }
-    
-    h1 { font-size: 2.2rem; line-height: 1.25; }
-    h2 { font-size: 1.65rem; line-height: 1.3; }
-    h3 { font-size: 1.3rem; line-height: 1.35; }
+    h1 { font-size: 2.15rem; line-height: 1.25; margin-bottom: 0.4rem; }
+    h2 { font-size: 1.6rem; line-height: 1.3; margin-top: 1.2rem; margin-bottom: 0.6rem; }
+    h3 { font-size: 1.25rem; line-height: 1.35; margin-bottom: 0.5rem; }
     p, span, label, div {
         color: var(--color-cocoa);
         font-family: var(--font-sans);
     }
 
-    /* Brand Header Banner */
-    .brand-header {
-        background: linear-gradient(135deg, #FFF9F5 0%, #F8E5DB 60%, #EAE5F4 100%);
+    /* App Header Navbar */
+    .header-navbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: var(--color-white);
         border: 1px solid var(--color-border);
-        border-radius: 14px;
-        padding: 30px 36px;
-        margin-bottom: 24px;
-        box-shadow: 0 2px 12px rgba(89, 67, 63, 0.04);
+        border-radius: 12px;
+        padding: 14px 24px;
+        margin-bottom: 22px;
+        box-shadow: 0 2px 8px rgba(89, 67, 63, 0.03);
     }
-    .brand-eyebrow {
-        font-size: 0.8rem;
+    .header-logo {
+        font-family: var(--font-serif);
+        font-size: 1.65rem;
+        color: var(--color-cocoa);
+        letter-spacing: -0.02em;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .header-tagline {
+        font-family: var(--font-sans);
+        font-size: 0.72rem;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.08em;
         color: var(--color-mauve);
-        margin-bottom: 6px;
-    }
-    .brand-title {
-        font-family: var(--font-serif);
-        color: var(--color-cocoa);
-        font-size: 2.35rem;
-        font-weight: 400;
-        margin-bottom: 8px;
-    }
-    .brand-subtitle {
-        color: #735D58;
-        font-size: 1.02rem;
-        line-height: 1.5;
-        max-width: 820px;
-        margin-bottom: 16px;
-    }
-    .brand-pills {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-    }
-    .pill-item {
-        background: var(--color-white);
-        border: 1px solid #EADBCE;
-        color: var(--color-cocoa);
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 0.78rem;
-        font-weight: 500;
+        margin-left: 4px;
     }
 
-    /* Cards */
-    .herai-card {
+    /* Welcome / Hero Section */
+    .hero-banner {
+        background: linear-gradient(135deg, #FFF9F5 0%, #F8E5DB 55%, #EAE5F4 100%);
+        border: 1px solid var(--color-border);
+        border-radius: 14px;
+        padding: 28px 34px;
+        margin-bottom: 22px;
+        box-shadow: 0 2px 10px rgba(89, 67, 63, 0.03);
+    }
+    .hero-headline {
+        font-family: var(--font-serif);
+        font-size: 2.25rem;
+        color: var(--color-cocoa);
+        margin-bottom: 8px;
+        line-height: 1.2;
+    }
+    .hero-subtext {
+        font-size: 1.02rem;
+        color: #6E5752;
+        line-height: 1.5;
+        max-width: 780px;
+        margin-bottom: 18px;
+    }
+
+    /* Card System */
+    .card-surface {
         background: var(--color-white);
         border: 1px solid var(--color-border);
         border-radius: 12px;
-        padding: 22px 24px;
+        padding: 20px 22px;
         margin-bottom: 18px;
         box-shadow: 0 2px 8px rgba(89, 67, 63, 0.03);
     }
-    .herai-card-title {
+    .card-header-serif {
         font-family: var(--font-serif);
-        font-size: 1.25rem;
+        font-size: 1.22rem;
         color: var(--color-cocoa);
         margin-bottom: 14px;
         padding-bottom: 8px;
@@ -162,39 +180,37 @@ st.markdown("""
         gap: 8px;
     }
 
-    /* Result Banner */
-    .result-box {
-        border-radius: 12px;
-        padding: 22px 28px;
-        margin: 20px 0;
-        border: 1px solid;
+    /* Overview Stat Metric Box */
+    .metric-stat-box {
+        background: var(--color-white);
+        border: 1px solid var(--color-border);
+        border-radius: 10px;
+        padding: 16px 18px;
+        height: 100%;
+        box-shadow: 0 2px 6px rgba(89, 67, 63, 0.02);
     }
-    .result-optimal {
-        background: #F4F7F2;
-        border-color: #C8D7C2;
-        color: #385430;
-    }
-    .result-moderate {
-        background: #FDF6EE;
-        border-color: #F0D4BC;
-        color: #8C4E1A;
-    }
-    .result-suboptimal {
-        background: #FDF0F2;
-        border-color: #EAC4CA;
-        color: #822F3C;
-    }
-    .result-score-title {
-        font-family: var(--font-serif);
-        font-size: 1.65rem;
+    .metric-stat-label {
+        font-size: 0.78rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--color-mauve);
         margin-bottom: 4px;
     }
-    .result-score-desc {
-        font-size: 0.96rem;
-        line-height: 1.5;
+    .metric-stat-value {
+        font-family: var(--font-serif);
+        font-size: 1.7rem;
+        color: var(--color-cocoa);
+        line-height: 1.2;
+        margin-bottom: 4px;
+    }
+    .metric-stat-detail {
+        font-size: 0.8rem;
+        color: #7A6560;
+        line-height: 1.35;
     }
 
-    /* Form Elements & Buttons */
+    /* Primary and Secondary CTA Buttons */
     .stButton>button {
         background: var(--color-mauve);
         color: var(--color-white);
@@ -202,50 +218,27 @@ st.markdown("""
         font-weight: 600;
         border: none;
         border-radius: 8px;
-        padding: 10px 24px;
-        font-size: 0.98rem;
-        letter-spacing: 0.01em;
+        padding: 10px 22px;
+        font-size: 0.96rem;
         box-shadow: 0 2px 8px rgba(185, 123, 138, 0.28);
         transition: all 0.2s ease;
     }
     .stButton>button:hover {
         background: #A26876;
         color: var(--color-white);
-        box-shadow: 0 4px 12px rgba(185, 123, 138, 0.38);
+        box-shadow: 0 4px 12px rgba(185, 123, 138, 0.36);
     }
 
-    /* Tabs Styling */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 12px;
-        background-color: transparent;
-        border-bottom: 1px solid var(--color-border);
-        padding-bottom: 4px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        font-family: var(--font-sans);
-        font-size: 0.95rem;
-        font-weight: 500;
-        color: #7A6560;
-        background-color: transparent;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 6px;
-    }
-    .stTabs [aria-selected="true"] {
-        color: var(--color-cocoa) !important;
-        font-weight: 600;
-        background-color: var(--color-peach) !important;
-    }
-
-    /* Alerts and Disclaimers */
-    .alert-callout {
+    /* Callout & Disclaimer */
+    .callout-lavender {
         background: var(--color-lavender);
         border-left: 3px solid var(--color-mauve);
         padding: 12px 16px;
         border-radius: 0 8px 8px 0;
-        font-size: 0.88rem;
+        font-size: 0.86rem;
         color: var(--color-cocoa);
         margin: 12px 0;
+        line-height: 1.45;
     }
     .disclaimer-card {
         background: #FAF5F2;
@@ -255,17 +248,44 @@ st.markdown("""
         font-size: 0.82rem;
         line-height: 1.55;
         color: #7A6560;
-        margin-top: 30px;
+        margin-top: 32px;
+    }
+
+    /* Prediction Result Banner */
+    .score-result-banner {
+        border-radius: 12px;
+        padding: 22px 28px;
+        margin: 18px 0 22px 0;
+        border: 1px solid;
+    }
+    .score-banner-optimal {
+        background: #F4F7F2;
+        border-color: #C8D7C2;
+        color: #385430;
+    }
+    .score-banner-moderate {
+        background: #FDF6EE;
+        border-color: #F0D4BC;
+        color: #8C4E1A;
+    }
+    .score-result-title {
+        font-family: var(--font-serif);
+        font-size: 1.65rem;
+        margin-bottom: 4px;
+    }
+    .score-result-subtitle {
+        font-size: 0.95rem;
+        line-height: 1.5;
     }
 
     /* Empty state */
-    .empty-state-box {
-        text-align: center;
-        padding: 40px 20px;
+    .empty-state-card {
+        background: var(--color-white);
         border: 1px dashed var(--color-border);
         border-radius: 12px;
-        background: var(--color-white);
-        margin: 18px 0;
+        padding: 30px;
+        text-align: center;
+        color: #7A6560;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -278,8 +298,8 @@ def get_predictor() -> HerAIPredictor:
 
 
 @st.cache_data
-def get_training_data() -> pd.DataFrame:
-    """Load and cache training data for distributions and trajectories."""
+def get_cohort_dataset() -> pd.DataFrame:
+    """Load and cache training cohort data for overview metrics and distributions."""
     if TRAINING_DATA_PATH.exists():
         return pd.read_csv(TRAINING_DATA_PATH)
     elif ENGINEERED_DATA_PATH.exists():
@@ -287,593 +307,757 @@ def get_training_data() -> pd.DataFrame:
     return pd.DataFrame()
 
 
-def render_brand_header():
-    """Render the calm, trustworthy product identity header."""
-    st.markdown("""
-    <div class="brand-header">
-        <div class="brand-eyebrow">Women's Menstrual Health Analytics</div>
-        <div class="brand-title">HERAI Health Intelligence</div>
-        <div class="brand-subtitle">
-            AI-assisted menstrual-health pattern analysis and next-cycle health-score prediction.
-            HERAI demonstrates how validated cycle observations, lifestyle habits, and prior cycle metrics
-            combine to model overall cycle wellbeing using transparent regression machine learning.
+def render_app_header():
+    """Render the top clean application header with HERAI wordmark and navigation."""
+    nav_col1, nav_col2 = st.columns([1, 2.2], vertical_alignment="center")
+
+    with nav_col1:
+        st.markdown("""
+        <div style="display: flex; align-items: baseline; gap: 8px;">
+            <span style="font-family: 'DM Serif Display', Georgia, serif; font-size: 1.85rem; color: #59433F; font-weight: 400;">HERAI</span>
+            <span style="font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #B97B8A;">Health Intelligence</span>
         </div>
-        <div class="brand-pills">
-            <span class="pill-item">🔒 Privacy-Conscious (Zero Stranger Data)</span>
-            <span class="pill-item">📐 37-Feature Ridge Regression (R² = 0.462)</span>
-            <span class="pill-item">🛡️ User-Isolated Split Validation (N=15,976)</span>
-            <span class="pill-item">🩺 Non-Diagnostic Prototype</span>
+        """, unsafe_allow_html=True)
+
+    with nav_col2:
+        pages = ["Dashboard", "Health Prediction", "Cycle Information", "Model Insights", "About"]
+        current_idx = pages.index(st.session_state.current_page) if st.session_state.current_page in pages else 0
+        selected = st.radio(
+            "Navigation",
+            pages,
+            index=current_idx,
+            horizontal=True,
+            label_visibility="collapsed",
+            key="header_nav_radio"
+        )
+        if selected != st.session_state.current_page:
+            st.session_state.current_page = selected
+            st.rerun()
+
+    st.markdown("<hr style='margin: 8px 0 20px 0; border: none; border-top: 1px solid #F0E2DA;'>", unsafe_allow_html=True)
+
+
+# =============================================================================
+# VIEW 1: DASHBOARD
+# =============================================================================
+def render_dashboard(cohort_df: pd.DataFrame):
+    """Render the Main Dashboard with Welcome Hero, Overview Cards, and Cohort Visualizations."""
+    # B. Landing page / Introduction section
+    st.markdown("""
+    <div class="hero-banner">
+        <div class="hero-headline">Understand Your Cycle. Discover Your Patterns.</div>
+        <div class="hero-subtext">
+            Explore menstrual-health patterns through data-driven insights and an experimental next-cycle health-score prediction model.
         </div>
     </div>
     """, unsafe_allow_html=True)
 
+    # Hero Action Buttons and Subtle Pattern Wave
+    cta_col, wave_col = st.columns([1.1, 1.9], vertical_alignment="center")
+    with cta_col:
+        btn_explore = st.button("Explore Your Health", use_container_width=True, key="btn_hero_explore")
+        if btn_explore:
+            st.session_state.current_page = "Health Prediction"
+            st.rerun()
 
-def main():
-    render_brand_header()
-    predictor = get_predictor()
-    cohort_df = get_training_data()
+        st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
+        btn_how = st.button("How It Works", use_container_width=True, key="btn_hero_how")
+        if btn_how:
+            st.session_state.current_page = "Model Insights"
+            st.rerun()
 
-    # Core navigation tabs
-    tab_forecast, tab_cohort, tab_transparency, tab_education = st.tabs([
-        "Forecast & Consultation",
-        "Cohort & Longitudinal Patterns",
-        "Model Transparency & Evidence",
-        "Cycle Health Knowledge"
-    ])
+    with wave_col:
+        fig_wave = create_cycle_wave_hero()
+        st.plotly_chart(fig_wave, use_container_width=True, config={"displayModeBar": False})
 
-    # =========================================================================
-    # TAB 1: FORECAST & CONSULTATION
-    # =========================================================================
-    with tab_forecast:
-        st.markdown("### Next-Cycle Health Score Forecast")
-        st.markdown(
-            "Provide observations from your current menstrual cycle along with your baseline lifestyle profile. "
-            "HERAI analyzes symptom burden, emotional wellbeing, sleep duration, and baseline stress "
-            "to estimate your predicted overall health score for your **next upcoming cycle**."
-        )
+    st.markdown("<hr style='margin: 22px 0; border: none; border-top: 1px solid #F0E2DA;'>", unsafe_allow_html=True)
 
-        # Preset consultation selector for rapid reviewer testing
-        col_preset, col_note = st.columns([2, 3])
-        with col_preset:
-            preset = st.selectbox(
-                "Clinical / Observational Preset:",
-                [
-                    "Custom (Enter Your Own Data)",
-                    "Balanced & Rested Cycle (Favorable Wellbeing)",
-                    "High Workplace Stress & Sub-optimal Sleep",
-                    "Elevated Cramping & Moderate Dysmenorrhea",
-                    "Longer Cycle Length with Mild Symptoms"
-                ],
-                index=0,
-                help="Preload representative cycle observations to explore how the model responds to varied lifestyle and symptom patterns."
-            )
+    # C. Overview Cards
+    st.markdown("### System & Cohort Overview")
 
-        with col_note:
-            st.markdown("""
-            <div class="alert-callout">
-                <b>Data Integrity:</b> Predictions utilize strictly your provided inputs. 
-                If you have not logged a prior cycle, the pipeline applies transparent cohort baseline medians 
-                without substituting an individual stranger's personal health record.
-            </div>
-            """, unsafe_allow_html=True)
+    c1, c2, c3, c4 = st.columns(4)
 
-        # Preset mapping
-        if preset == "Balanced & Rested Cycle (Favorable Wellbeing)":
-            def_age, def_bmi, def_diet, def_exercise = 28, 22.2, "Good", "3–4 days/week"
-            def_bsleep, def_bstress = 8.0, 3.0
-            def_clen, def_phase, def_flow, def_pain = 28, "Menstrual", "Medium", 2
-            def_mood, def_stress, def_sleep = 8, 3.0, 8.0
-            def_energy, def_focus, def_lost = 8, 8, 0.0
-            def_bc, def_pcos = 0, 0
-        elif preset == "High Workplace Stress & Sub-optimal Sleep":
-            def_age, def_bmi, def_diet, def_exercise = 31, 24.0, "Fair", "1–2 days/week"
-            def_bsleep, def_bstress = 6.5, 7.5
-            def_clen, def_phase, def_flow, def_pain = 31, "Luteal", "Medium", 4
-            def_mood, def_stress, def_sleep = 5, 8.0, 5.5
-            def_energy, def_focus, def_lost = 4, 5, 4.0
-            def_bc, def_pcos = 0, 0
-        elif preset == "Elevated Cramping & Moderate Dysmenorrhea":
-            def_age, def_bmi, def_diet, def_exercise = 26, 21.5, "Good", "1–2 days/week"
-            def_bsleep, def_bstress = 7.0, 5.0
-            def_clen, def_phase, def_flow, def_pain = 27, "Menstrual", "Heavy", 7
-            def_mood, def_stress, def_sleep = 4, 6.0, 6.0
-            def_energy, def_focus, def_lost = 4, 4, 6.0
-            def_bc, def_pcos = 0, 0
-        elif preset == "Longer Cycle Length with Mild Symptoms":
-            def_age, def_bmi, def_diet, def_exercise = 29, 26.5, "Fair", "3–4 days/week"
-            def_bsleep, def_bstress = 7.5, 5.5
-            def_clen, def_phase, def_flow, def_pain = 36, "Follicular", "Light", 3
-            def_mood, def_stress, def_sleep = 6, 5.0, 7.5
-            def_energy, def_focus, def_lost = 6, 6, 0.0
-            def_bc, def_pcos = 0, 1
-        else:
-            def_age, def_bmi, def_diet, def_exercise = 28, 22.5, "Good", "3–4 days/week"
-            def_bsleep, def_bstress = 7.5, 4.0
-            def_clen, def_phase, def_flow, def_pain = 28, "Menstrual", "Medium", 3
-            def_mood, def_stress, def_sleep = 7, 4.0, 7.5
-            def_energy, def_focus, def_lost = 7, 7, 0.0
-            def_bc, def_pcos = 0, 0
+    total_records = len(cohort_df) if not cohort_df.empty else 15976
+    unique_users = cohort_df["user_id"].nunique() if not cohort_df.empty and "user_id" in cohort_df.columns else 2000
+    avg_cycle_len = f"{cohort_df['cycle_length_days'].mean():.1f} Days" if not cohort_df.empty and "cycle_length_days" in cohort_df.columns else "27.8 Days"
 
-        # Form layout in 3 structured cards
-        col1, col2, col3 = st.columns([1, 1, 1], gap="medium")
+    with c1:
+        st.markdown(f"""
+        <div class="metric-stat-box">
+            <div class="metric-stat-label">Evaluated Cycles</div>
+            <div class="metric-stat-value">{total_records:,}</div>
+            <div class="metric-stat-detail">Across {unique_users:,} user profiles in training cohort</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-        with col1:
-            st.markdown('<div class="herai-card"><div class="herai-card-title">1. Baseline & Lifestyle</div>', unsafe_allow_html=True)
-            age = st.slider("Age", 15, 60, def_age, help="Chronological age in years (15–60)")
-            bmi = st.slider("BMI", 15.0, 45.0, float(def_bmi), step=0.1, help="Body Mass Index (kg/m²)")
+    with c2:
+        st.markdown(f"""
+        <div class="metric-stat-box">
+            <div class="metric-stat-label">Observed Cycle Length</div>
+            <div class="metric-stat-value">{avg_cycle_len}</div>
+            <div class="metric-stat-detail">Median: 28.0 days (Std Dev: ±2.4 days)</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-            diet_quality = st.selectbox(
-                "Dietary Pattern",
-                ["Good", "Fair", "Poor", "Excellent"],
-                index=["Good", "Fair", "Poor", "Excellent"].index(def_diet),
-                help="General nutritional balance and whole-food intake."
-            )
-            exercise_freq = st.selectbox(
-                "Exercise Frequency",
-                ["Never", "1–2 days/week", "3–4 days/week", "5–6 days/week", "Daily"],
-                index=["Never", "1–2 days/week", "3–4 days/week", "5–6 days/week", "Daily"].index(def_exercise)
-            )
-            base_sleep = st.slider("Baseline Daily Sleep (Hours)", 4.0, 11.0, float(def_bsleep), step=0.5)
-            base_stress = st.slider("Baseline Daily Stress (0–10)", 0.0, 10.0, float(def_bstress), step=0.5, help="0 = Completely calm, 10 = Chronic severe stress")
+    with c3:
+        st.markdown("""
+        <div class="metric-stat-box">
+            <div class="metric-stat-label">Production Model</div>
+            <div class="metric-stat-value" style="font-size: 1.35rem; padding-top: 4px;">Ridge (37 Feat.)</div>
+            <div class="metric-stat-detail">R² = 0.4620 | MAE = 0.6448 on test users</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-            with st.expander("Additional Observational Biomarkers"):
-                st.caption("Note: Observational covariates for regression modeling; not used for clinical diagnosis.")
-                pcos_obs = st.checkbox("Self-Reported History of PCOS", value=bool(def_pcos))
-                bc_obs = st.checkbox("Hormonal Contraceptive Use", value=bool(def_bc))
-                caffeine_intake = st.slider("Caffeine Intake (cups/day)", 0.0, 6.0, 1.5, step=0.5)
-                water_intake = st.slider("Daily Water Intake (Liters)", 0.5, 5.0, 2.0, step=0.5)
-                smoking_stat = st.selectbox("Smoking Status", ["Non-smoker", "Former", "Smoker"], index=0)
-                alcohol_stat = st.selectbox("Alcohol Consumption", ["None", "Occasional", "Moderate", "Frequent"], index=0)
-                state_region = st.selectbox("Geographic Region", ["California", "New York", "Texas", "Florida", "Illinois", "Other"], index=0)
-
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        with col2:
-            st.markdown('<div class="herai-card"><div class="herai-card-title">2. Current Cycle Observations</div>', unsafe_allow_html=True)
-            cycle_length = st.slider("Cycle Length (Days)", 18, 45, def_clen, help="Length of your current menstrual cycle from Day 1 to the day before the next period.")
-            cycle_phase = st.selectbox("Current Cycle Phase", ["Menstrual", "Follicular", "Ovulation", "Luteal"], index=["Menstrual", "Follicular", "Ovulation", "Luteal"].index(def_phase))
-            flow_level = st.selectbox("Flow Heaviness", ["Light", "Medium", "Heavy", "Very Heavy"], index=["Light", "Medium", "Heavy", "Very Heavy"].index(def_flow))
-
-            pain_score = st.slider("Pain / Cramping Intensity (0–10)", 0, 10, int(def_pain), help="0 = Completely pain-free, 10 = Intractable cramping affecting activities")
-            mood_score = st.slider("Emotional Wellbeing (0–10)", 0, 10, int(def_mood), help="0 = Severe mood dysregulation/irritability, 10 = Positive, resilient mood")
-            cycle_stress = st.slider("Cycle Stress Burden (0–10)", 0.0, 10.0, float(def_stress), step=0.5)
-            cycle_sleep = st.slider("Sleep During Current Cycle (Hours)", 4.0, 12.0, float(def_sleep), step=0.5)
-            energy_score = st.slider("Energy & Vitality (0–10)", 0, 10, int(def_energy))
-            focus_score = st.slider("Focus & Cognitive Clarity (0–10)", 0, 10, int(def_focus))
-            hours_lost = st.number_input("Work / School Hours Lost (Hours)", min_value=0.0, max_value=40.0, value=float(def_lost), step=1.0)
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        with col3:
-            st.markdown('<div class="herai-card"><div class="herai-card-title">3. Historical Tracking Mode</div>', unsafe_allow_html=True)
-            hist_option = st.radio(
-                "Cycle History Mode:",
-                [
-                    "Cycle 1 / First-time user (No prior cycle record)",
-                    "Returning user (I have my prior cycle observations)"
-                ],
-                index=0,
-                help="Select whether this is your first cycle logged or if you have historical records from your preceding cycle."
-            )
-
-            has_history = "Returning user" in hist_option
-            hist_input: Optional[HistoricalCycleInput] = None
-
-            if not has_history:
-                st.markdown("""
-                <div style="background: #F8EDE7; border: 1px solid #ECDAD2; border-radius: 8px; padding: 12px 14px; font-size: 0.84rem; color: #59433F; margin-top: 8px;">
-                    <b>First-Time Baseline Policy:</b><br>
-                    Because this is Cycle 1, the pipeline applies transparent cohort medians from the training split (N=15,976) 
-                    for prior-cycle lag variables. Your personal data is never supplemented with another individual's records.
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown("""
-                <div style="background: #EEF4EC; border: 1px solid #D5E2D0; border-radius: 8px; padding: 10px 14px; font-size: 0.84rem; color: #385430; margin-top: 8px;">
-                    <b>Personalized Lag Alignment:</b><br>
-                    Prior-cycle values below will serve as exact historical lag features for your forecast.
-                </div>
-                """, unsafe_allow_html=True)
-                prev_health = st.slider("Previous Cycle Overall Health (0–10)", 2.0, 10.0, 8.0, step=0.2)
-                prev_len = st.slider("Previous Cycle Length (Days)", 20, 42, 28)
-                prev_pain = st.slider("Previous Cycle Pain (0–10)", 0, 10, 3)
-                prev_stress = st.slider("Previous Cycle Stress (0–10)", 0.0, 10.0, 4.0, step=0.5)
-                prev_sleep = st.slider("Previous Cycle Sleep (Hours)", 4.0, 11.0, 7.5, step=0.5)
-                prev_energy = st.slider("Previous Cycle Vitality (0–10)", 0, 10, 7)
-                prev_mood = st.slider("Previous Cycle Mood (0–10)", 0, 10, 7)
-                prev_focus = st.slider("Previous Cycle Concentration (0–10)", 0, 10, 7)
-
-                hist_input = HistoricalCycleInput(
-                    previous_health_score=prev_health,
-                    previous_cycle_length_feature=float(prev_len),
-                    previous_pain_level=float(prev_pain),
-                    previous_stress_score=float(prev_stress),
-                    previous_sleep_hours=float(prev_sleep),
-                    previous_mood_score=float(prev_mood),
-                    previous_energy_level=float(prev_energy),
-                    previous_concentration_score=float(prev_focus),
-                    previous_work_hours_lost=0.0,
-                    previous_flow_level="Medium",
-                    previous_pms_symptoms="Mild",
-                )
-
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        # Action button
-        st.markdown("<div style='margin-top: 14px;'></div>", unsafe_allow_html=True)
-        btn_run = st.button("Generate Next-Cycle Health Score Forecast", use_container_width=True)
-
-        # Run prediction
-        if btn_run or preset != "Custom (Enter Your Own Data)":
-            profile_obj = UserProfileInput(
-                age=float(age),
-                bmi=float(bmi),
-                sleep_hours=float(base_sleep),
-                stress_score_baseline=float(base_stress),
-                state=state_region,
-                diet_quality=diet_quality,
-                exercise_frequency=exercise_freq,
-                caffeine_intake=float(caffeine_intake),
-                water_intake_liters=float(water_intake),
-                alcohol_consumption=alcohol_stat,
-                smoking_status=smoking_stat,
-                birth_control_use=1 if bc_obs else 0,
-                pcos_diagnosed=1 if pcos_obs else 0,
-            )
-
-            cycle_obj = CurrentCycleInput(
-                cycle_length_days=float(cycle_length),
-                pain_level=float(pain_score),
-                mood_score=float(mood_score),
-                stress_score_cycle=float(cycle_stress),
-                sleep_hours_cycle=float(cycle_sleep),
-                energy_level=float(energy_score),
-                concentration_score=float(focus_score),
-                work_hours_lost=float(hours_lost),
-                cycle_phase=cycle_phase,
-                flow_level=flow_level,
-                pms_symptoms="Moderate" if pain_score > 5 else "Mild"
-            )
-
-            with st.spinner("Evaluating regression model and generating forecast..."):
-                pred_result = predictor.predict(profile_obj, cycle_obj, historical_cycle=hist_input)
-
-            # Results Section
-            st.markdown("<hr style='margin: 28px 0; border: none; border-top: 1px solid #F0E2DA;'>", unsafe_allow_html=True)
-            st.markdown("## Forecast & Pattern Analysis")
-
-            # Determine tone and styling
-            if pred_result.score_category == "Optimal":
-                box_style = "result-optimal"
-                tier_badge = "Favorable Equilibrium"
-            elif pred_result.score_category == "Moderate":
-                box_style = "result-moderate"
-                tier_badge = "Moderate Balance"
-            else:
-                box_style = "result-suboptimal"
-                tier_badge = "Attention State / Elevated Symptom Burden"
-
+    with c4:
+        last_pred = st.session_state.last_prediction
+        if last_pred is not None:
             st.markdown(f"""
-            <div class="result-box {box_style}">
-                <div class="result-score-title">
-                    Predicted Next-Cycle Health Score: <b>{pred_result.predicted_next_health_score:.2f} / 10.0</b> &nbsp;—&nbsp; {tier_badge}
-                </div>
-                <div class="result-score-desc">
-                    {pred_result.summary}
-                </div>
+            <div class="metric-stat-box" style="border-color: #D99AA5;">
+                <div class="metric-stat-label" style="color: #882D52;">Your Latest Forecast</div>
+                <div class="metric-stat-value">{last_pred.predicted_next_health_score:.2f} <span style="font-size: 1rem; color: #7A6560;">/ 10</span></div>
+                <div class="metric-stat-detail">{last_pred.score_category} Health Tier</div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div class="metric-stat-box" style="background: #FAF7F5;">
+                <div class="metric-stat-label">Your Latest Forecast</div>
+                <div class="metric-stat-value" style="font-size: 1.25rem; color: #8F7B76; padding-top: 4px;">No Forecast Yet</div>
+                <div class="metric-stat-detail">Run prediction to see your score</div>
             </div>
             """, unsafe_allow_html=True)
 
-            res_c1, res_c2 = st.columns([1, 1], gap="medium")
+    st.markdown("<div style='margin-top: 14px;'></div>", unsafe_allow_html=True)
 
-            with res_c1:
-                st.markdown('<div class="herai-card"><div class="herai-card-title">Forecast Meter</div>', unsafe_allow_html=True)
-                gauge_fig = create_gauge_chart(pred_result.predicted_next_health_score, pred_result.score_category)
-                st.plotly_chart(gauge_fig, use_container_width=True)
-                if pred_result.warnings:
-                    for w in pred_result.warnings:
-                        st.caption(f"ℹ️ {w}")
-                st.markdown('</div>', unsafe_allow_html=True)
+    # Health Pattern Visualizations
+    st.markdown("### Observational Health Patterns")
+    st.caption("Visualizing empirical trends across the validated dataset. Correlation does not imply causation.")
 
-            with res_c2:
-                st.markdown('<div class="herai-card"><div class="herai-card-title">Balance Profile Across 6 Wellbeing Dimensions</div>', unsafe_allow_html=True)
-                curr_dim = {
-                    "pain_level": pain_score,
-                    "mood_score": mood_score,
-                    "stress_score_cycle": cycle_stress,
-                    "sleep_hours_cycle": cycle_sleep,
-                    "energy_level": energy_score,
-                    "concentration_score": focus_score,
-                }
-                prev_dim = None
-                if hist_input:
-                    prev_dim = {
-                        "previous_pain_level": hist_input.previous_pain_level,
-                        "previous_mood_score": hist_input.previous_mood_score,
-                        "previous_stress_score": hist_input.previous_stress_score,
-                        "previous_sleep_hours": hist_input.previous_sleep_hours,
-                        "previous_energy_level": hist_input.previous_energy_level,
-                        "previous_concentration_score": hist_input.previous_concentration_score,
-                    }
-                radar_fig = create_radar_chart(curr_dim, prev_dim)
-                st.plotly_chart(radar_fig, use_container_width=True)
-                st.markdown('</div>', unsafe_allow_html=True)
+    chart_c1, chart_c2 = st.columns([1, 1], gap="medium")
 
-            # Restrained actionable insights
-            st.markdown('<div class="herai-card"><div class="herai-card-title">Actionable Wellness Observations</div>', unsafe_allow_html=True)
-            sugg_cols = st.columns(3)
-            with sugg_cols[0]:
-                if cycle_stress > 6.0 or base_stress > 6.0:
-                    st.markdown("""
-                    <div style="background: #FDF6EE; border: 1px solid #F0D4BC; border-radius: 8px; padding: 14px; font-size: 0.88rem;">
-                        <b style="color: #8C4E1A;">Stress Resilience Support</b><br>
-                        Elevated stress imparts a strong negative coefficient on next-cycle health. 
-                        Targeted down-regulation practices (somatic breathing, magnesium, restorative yoga) may help buffer follicular phase stability.
-                    </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.markdown("""
-                    <div style="background: #F4F7F2; border: 1px solid #C8D7C2; border-radius: 8px; padding: 14px; font-size: 0.88rem;">
-                        <b style="color: #385430;">Balanced Stress Reserves</b><br>
-                        Your reported stress burden is well-regulated, which statistically supports consistent hormonal signaling and regular ovulation.
-                    </div>
-                    """, unsafe_allow_html=True)
+    with chart_c1:
+        st.markdown('<div class="card-surface"><div class="card-header-serif">Observed Cycle Length Distribution</div>', unsafe_allow_html=True)
+        if not cohort_df.empty and "cycle_length_days" in cohort_df.columns:
+            fig_len = create_cycle_length_distribution_chart(cohort_df["cycle_length_days"])
+            st.plotly_chart(fig_len, use_container_width=True)
+            st.caption("Observed cycle length across 15,976 records follows an empirical normal distribution around 28 days.")
+        else:
+            st.info("Loading cycle distribution...")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-            with sugg_cols[1]:
-                if pain_score >= 5:
-                    st.markdown("""
-                    <div style="background: #FDF0F2; border: 1px solid #EAC4CA; border-radius: 8px; padding: 14px; font-size: 0.88rem;">
-                        <b style="color: #822F3C;">Comfort & Dysmenorrhea Support</b><br>
-                        Moderate-to-elevated cramping impacts daily functioning and health score continuity. 
-                        Consider discussing targeted anti-inflammatory nutrition, omega-3s, and thermal therapy with your physician.
-                    </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.markdown("""
-                    <div style="background: #F4F7F2; border: 1px solid #C8D7C2; border-radius: 8px; padding: 14px; font-size: 0.88rem;">
-                        <b style="color: #385430;">Comfort Maintained</b><br>
-                        Minimal dysmenorrhea was reported, correlating with higher next-cycle health scores and uninhibited daily productivity.
-                    </div>
-                    """, unsafe_allow_html=True)
+    with chart_c2:
+        st.markdown('<div class="card-surface"><div class="card-header-serif">Cohort Health Score Distribution</div>', unsafe_allow_html=True)
+        if not cohort_df.empty and "next_health_score" in cohort_df.columns:
+            user_val = st.session_state.last_prediction.predicted_next_health_score if st.session_state.last_prediction else None
+            fig_dist = create_cohort_distribution_chart(cohort_df["next_health_score"].dropna(), user_val)
+            st.plotly_chart(fig_dist, use_container_width=True)
+            st.caption("Distribution parameters across 15,976 cycles: Mean = 8.55, Median = 8.60, Std = 1.11, Range = [4.40, 10.00].")
+        else:
+            st.info("Loading health score distribution...")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-            with sugg_cols[2]:
-                if cycle_sleep < 7.0 or base_sleep < 7.0:
-                    st.markdown("""
-                    <div style="background: #FDF6EE; border: 1px solid #F0D4BC; border-radius: 8px; padding: 14px; font-size: 0.88rem;">
-                        <b style="color: #8C4E1A;">Sleep Hygiene Focus</b><br>
-                        Sub-7-hour sleep schedules correlate with increased perceived pain and lower vitality scores in subsequent cycles. 
-                        Prioritize consistent bedtimes and evening wind-down routines.
-                    </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.markdown("""
-                    <div style="background: #F4F7F2; border: 1px solid #C8D7C2; border-radius: 8px; padding: 14px; font-size: 0.88rem;">
-                        <b style="color: #385430;">Adequate Sleep Support</b><br>
-                        Sleep duration meets recommended physiological thresholds, supporting healthy melatonin balance and cognitive focus.
-                    </div>
-                    """, unsafe_allow_html=True)
+    # Longitudinal Multi-Cycle Trajectory Explorer
+    st.markdown('<div class="card-surface"><div class="card-header-serif">Longitudinal Cycle Trajectory in Real Records</div>', unsafe_allow_html=True)
+    if not cohort_df.empty and "user_id" in cohort_df.columns:
+        p_col1, p_col2 = st.columns([1, 3], vertical_alignment="center")
+        with p_col1:
+            sample_ids = ["U00001", "U00002", "U00003", "U00004", "U00005"]
+            selected_id = st.selectbox("Select Patient Record:", sample_ids, index=0)
+            st.caption("Inspect logged cycle scores and corresponding next-cycle actual values across consecutive cycles.")
+        with p_col2:
+            fig_traj = create_user_trajectory_chart(cohort_df, selected_id)
+            st.plotly_chart(fig_traj, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-            st.markdown('</div>', unsafe_allow_html=True)
 
-            # Printable Consultation Summary
-            with st.expander("View / Print Consultation Summary"):
-                st.text(f"""
-===========================================================
-HERAI CYCLE FORECAST CONSULTATION REPORT
-Generated: 2026-10-29
-Predicted Next-Cycle Health Score: {pred_result.predicted_next_health_score:.2f} / 10.0 ({pred_result.score_category})
-Mode: {'Longitudinal (User Prior Cycle)' if has_history else 'First-Time (Cohort Baseline)'}
------------------------------------------------------------
-OBSERVATIONAL PROFILE:
-- Age: {age} | BMI: {bmi:.1f} | Baseline Stress: {base_stress:.1f}
-- Current Cycle Length: {cycle_length} days | Phase: {cycle_phase} | Flow: {flow_level}
-- Pain Level: {pain_score}/10 | Mood Balance: {mood_score}/10 | Cycle Stress: {cycle_stress:.1f}/10
-- Cycle Sleep: {cycle_sleep:.1f} hrs | Energy: {energy_score}/10 | Concentration: {focus_score}/10
-- Work/Activity Hours Lost: {hours_lost:.1f} hrs
+# =============================================================================
+# VIEW 2: HEALTH PREDICTION
+# =============================================================================
+def render_health_prediction(predictor: HerAIPredictor):
+    """Render the Health Prediction Page with Structured 3-Section Inputs and Results."""
+    st.markdown("<h1>Health Score Prediction</h1>", unsafe_allow_html=True)
+    st.markdown(
+        "Enter your observational menstrual-cycle data, lifestyle factors, and prior cycle records. "
+        "HERAI applies the validated 37-feature Ridge Regression pipeline to estimate your overall health score for your next cycle."
+    )
 
-LIMITATIONS & DISCLAIMER:
-{pred_result.disclaimer}
-===========================================================
-                """)
+    # Preset selector for fast scenario testing
+    pr_col1, pr_col2 = st.columns([2, 3], vertical_alignment="center")
+    with pr_col1:
+        preset = st.selectbox(
+            "Preload Observational Scenario:",
+            [
+                "Custom Inputs",
+                "🌸 Balanced & Regular Cycle (Optimal Range)",
+                "⚡ High Stress & Moderate Fatigue",
+                "🩸 Elevated Cramping & Dysmenorrhea",
+                "🌿 Longer Cycle with Mild Symptoms"
+            ],
+            index=0,
+            help="Select a scenario to populate representative observational parameters."
+        )
+    with pr_col2:
+        st.markdown("""
+        <div class="callout-lavender" style="margin: 0;">
+            <b>Privacy & Integrity Guarantee:</b> Input values are processed strictly in-memory during your session. 
+            No records from other individuals are substituted to generate your prediction.
+        </div>
+        """, unsafe_allow_html=True)
 
-    # =========================================================================
-    # TAB 2: COHORT & LONGITUDINAL PATTERNS
-    # =========================================================================
-    with tab_cohort:
-        st.markdown("### Population Cohort & Longitudinal Tracking")
-        st.markdown(
-            "Examine observational distributions across the complete training cohort "
-            "(15,976 cycles across 2,000 users) and review authentic longitudinal user records."
+    # Default mapping
+    if preset == "🌸 Balanced & Regular Cycle (Optimal Range)":
+        def_age, def_bmi, def_diet, def_exercise = 28, 22.2, "Good", "3–4 days/week"
+        def_bsleep, def_bstress = 8.0, 3.0
+        def_clen, def_phase, def_flow, def_pain = 28, "Menstrual", "Medium", 2
+        def_mood, def_stress, def_sleep = 8, 3.0, 8.0
+        def_energy, def_focus, def_lost = 8, 8, 0.0
+        def_bc, def_pcos = 0, 0
+    elif preset == "⚡ High Stress & Moderate Fatigue":
+        def_age, def_bmi, def_diet, def_exercise = 31, 24.0, "Fair", "1–2 days/week"
+        def_bsleep, def_bstress = 6.5, 7.5
+        def_clen, def_phase, def_flow, def_pain = 31, "Luteal", "Medium", 4
+        def_mood, def_stress, def_sleep = 5, 8.0, 5.5
+        def_energy, def_focus, def_lost = 4, 5, 4.0
+        def_bc, def_pcos = 0, 0
+    elif preset == "🩸 Elevated Cramping & Dysmenorrhea":
+        def_age, def_bmi, def_diet, def_exercise = 26, 21.5, "Good", "1–2 days/week"
+        def_bsleep, def_bstress = 7.0, 5.0
+        def_clen, def_phase, def_flow, def_pain = 27, "Menstrual", "Heavy", 7
+        def_mood, def_stress, def_sleep = 4, 6.0, 6.0
+        def_energy, def_focus, def_lost = 4, 4, 6.0
+        def_bc, def_pcos = 0, 0
+    elif preset == "🌿 Longer Cycle with Mild Symptoms":
+        def_age, def_bmi, def_diet, def_exercise = 29, 26.5, "Fair", "3–4 days/week"
+        def_bsleep, def_bstress = 7.5, 5.5
+        def_clen, def_phase, def_flow, def_pain = 36, "Follicular", "Light", 3
+        def_mood, def_stress, def_sleep = 6, 5.0, 7.5
+        def_energy, def_focus, def_lost = 6, 6, 0.0
+        def_bc, def_pcos = 0, 1
+    else:
+        def_age, def_bmi, def_diet, def_exercise = 28, 22.5, "Good", "3–4 days/week"
+        def_bsleep, def_bstress = 7.5, 4.0
+        def_clen, def_phase, def_flow, def_pain = 28, "Menstrual", "Medium", 3
+        def_mood, def_stress, def_sleep = 7, 4.0, 7.5
+        def_energy, def_focus, def_lost = 7, 7, 0.0
+        def_bc, def_pcos = 0, 0
+
+    col1, col2, col3 = st.columns([1, 1, 1], gap="medium")
+
+    # Section 1: Menstrual-Cycle Information
+    with col1:
+        st.markdown('<div class="card-surface"><div class="card-header-serif">1. Cycle Observations</div>', unsafe_allow_html=True)
+        cycle_length = st.slider("Cycle Length (Days)", 18, 45, def_clen, help="Total days from period start to the day before the next period.")
+        cycle_phase = st.selectbox("Current Cycle Phase", ["Menstrual", "Follicular", "Ovulation", "Luteal"], index=["Menstrual", "Follicular", "Ovulation", "Luteal"].index(def_phase))
+        flow_level = st.selectbox("Flow Heaviness", ["Light", "Medium", "Heavy", "Very Heavy"], index=["Light", "Medium", "Heavy", "Very Heavy"].index(def_flow))
+
+        pain_score = st.slider("Pain / Cramping Intensity (0–10)", 0, 10, int(def_pain), help="0 = Completely pain-free, 10 = Severe debilitating cramping")
+        mood_score = st.slider("Emotional Wellbeing (0–10)", 0, 10, int(def_mood), help="0 = Severe distress/irritability, 10 = Positive, resilient mood")
+        cycle_stress = st.slider("Cycle Stress Burden (0–10)", 0.0, 10.0, float(def_stress), step=0.5)
+        cycle_sleep = st.slider("Cycle Sleep Duration (Hours)", 4.0, 12.0, float(def_sleep), step=0.5)
+        energy_score = st.slider("Vitality & Energy (0–10)", 0, 10, int(def_energy))
+        focus_score = st.slider("Cognitive Focus (0–10)", 0, 10, int(def_focus))
+        hours_lost = st.number_input("Work / School Hours Lost Due to Symptoms", min_value=0.0, max_value=40.0, value=float(def_lost), step=1.0)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Section 2: Lifestyle and Health Information
+    with col2:
+        st.markdown('<div class="card-surface"><div class="card-header-serif">2. Lifestyle & Biomarkers</div>', unsafe_allow_html=True)
+        age = st.slider("Age (Years)", 15, 60, def_age)
+        bmi = st.slider("BMI (Body Mass Index)", 15.0, 45.0, float(def_bmi), step=0.1)
+
+        diet_quality = st.selectbox(
+            "Diet Quality",
+            ["Good", "Fair", "Poor", "Excellent"],
+            index=["Good", "Fair", "Poor", "Excellent"].index(def_diet)
+        )
+        exercise_freq = st.selectbox(
+            "Exercise Frequency",
+            ["Never", "1–2 days/week", "3–4 days/week", "5–6 days/week", "Daily"],
+            index=["Never", "1–2 days/week", "3–4 days/week", "5–6 days/week", "Daily"].index(def_exercise)
+        )
+        base_sleep = st.slider("Baseline Daily Sleep (Hours)", 4.0, 11.0, float(def_bsleep), step=0.5)
+        base_stress = st.slider("Baseline Daily Stress (0–10)", 0.0, 10.0, float(def_bstress), step=0.5)
+
+        with st.expander("Additional Model Covariates"):
+            st.caption("Non-diagnostic observational inputs used in the Ridge regression model.")
+            pcos_obs = st.checkbox("Self-Reported History of PCOS", value=bool(def_pcos))
+            bc_obs = st.checkbox("Hormonal Contraceptive Use", value=bool(def_bc))
+            caffeine_intake = st.slider("Caffeine Intake (cups/day)", 0.0, 6.0, 1.5, step=0.5)
+            water_intake = st.slider("Water Intake (Liters/day)", 0.5, 5.0, 2.0, step=0.5)
+            smoking_stat = st.selectbox("Smoking Status", ["Non-smoker", "Former", "Smoker"], index=0)
+            alcohol_stat = st.selectbox("Alcohol Consumption", ["None", "Occasional", "Moderate", "Frequent"], index=0)
+            state_region = st.selectbox("State / Region", ["California", "New York", "Texas", "Florida", "Illinois", "Other"], index=0)
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Section 3: Previous-Cycle Information
+    with col3:
+        st.markdown('<div class="card-surface"><div class="card-header-serif">3. Historical Records</div>', unsafe_allow_html=True)
+        hist_mode = st.radio(
+            "History Availability:",
+            [
+                "Cycle 1 (No prior cycle record logged)",
+                "Returning User (I have my previous cycle data)"
+            ],
+            index=0,
+            help="Choose whether to apply reference population medians (Cycle 1) or your own logged historical metrics."
         )
 
-        tr_c1, tr_c2 = st.columns([1, 1], gap="medium")
+        has_history = "Returning User" in hist_mode
+        hist_input: Optional[HistoricalCycleInput] = None
 
-        with tr_c1:
-            st.markdown('<div class="herai-card"><div class="herai-card-title">Population Score Distribution</div>', unsafe_allow_html=True)
-            if not cohort_df.empty and "next_health_score" in cohort_df.columns:
-                dist_fig = create_cohort_distribution_chart(cohort_df["next_health_score"].dropna())
-                st.plotly_chart(dist_fig, use_container_width=True)
-                st.caption("Distribution parameters across 15,976 cycles: Mean = 8.55, Median = 8.60, Std = 1.11, Range = [4.40, 10.00].")
-            else:
-                st.info("Cohort data loading...")
-            st.markdown('</div>', unsafe_allow_html=True)
+        if not has_history:
+            st.markdown("""
+            <div style="background: #F8EDE7; border: 1px solid #ECDAD2; border-radius: 8px; padding: 12px; font-size: 0.84rem; color: #59433F; margin-top: 8px;">
+                <b>Cycle 1 Baseline Policy:</b><br>
+                Because this is your first cycle logged, the pipeline utilizes training cohort reference medians (N=15,976) 
+                for prior-cycle lag variables. Your personal information is never mixed with another individual's data.
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div style="background: #EEF4EC; border: 1px solid #D5E2D0; border-radius: 8px; padding: 10px 12px; font-size: 0.84rem; color: #385430; margin-top: 8px;">
+                <b>User Historical Records:</b><br>
+                Enter your observations from your preceding cycle.
+            </div>
+            """, unsafe_allow_html=True)
+            prev_health = st.slider("Previous Cycle Overall Health (0–10)", 2.0, 10.0, 8.0, step=0.2)
+            prev_len = st.slider("Previous Cycle Length (Days)", 20, 42, 28)
+            prev_pain = st.slider("Previous Cycle Pain (0–10)", 0, 10, 3)
+            prev_stress = st.slider("Previous Cycle Stress (0–10)", 0.0, 10.0, 4.0, step=0.5)
+            prev_sleep = st.slider("Previous Cycle Sleep (Hours)", 4.0, 11.0, 7.5, step=0.5)
+            prev_energy = st.slider("Previous Cycle Vitality (0–10)", 0, 10, 7)
+            prev_mood = st.slider("Previous Cycle Mood (0–10)", 0, 10, 7)
+            prev_focus = st.slider("Previous Cycle Concentration (0–10)", 0, 10, 7)
 
-        with tr_c2:
-            st.markdown('<div class="herai-card"><div class="herai-card-title">Longitudinal Patient Trajectories</div>', unsafe_allow_html=True)
-            if not cohort_df.empty and "user_id" in cohort_df.columns:
-                cohort_users = ["U00001", "U00002", "U00003", "U00004", "U00005"]
-                picked_user = st.selectbox("Inspect Cohort Patient Trajectory:", cohort_users, index=0)
-                traj_fig = create_user_trajectory_chart(cohort_df, picked_user)
-                st.plotly_chart(traj_fig, use_container_width=True)
-                st.caption(f"Visualizing logged cycle health score vs actual next-cycle target across cycles for user {picked_user}.")
-            else:
-                st.info("Records unavailable.")
-            st.markdown('</div>', unsafe_allow_html=True)
+            hist_input = HistoricalCycleInput(
+                previous_health_score=prev_health,
+                previous_cycle_length_feature=float(prev_len),
+                previous_pain_level=float(prev_pain),
+                previous_stress_score=float(prev_stress),
+                previous_sleep_hours=float(prev_sleep),
+                previous_mood_score=float(prev_mood),
+                previous_energy_level=float(prev_energy),
+                previous_concentration_score=float(prev_focus),
+                previous_work_hours_lost=0.0,
+                previous_flow_level="Medium",
+                previous_pms_symptoms="Mild",
+            )
 
-        st.markdown('<div class="herai-card"><div class="herai-card-title">Verified Findings from Cohort Data</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Prediction Action Button
+    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+    btn_predict = st.button("Generate Health Score Prediction", use_container_width=True, key="btn_run_prediction")
+
+    if btn_predict or preset != "Custom Inputs":
+        profile_obj = UserProfileInput(
+            age=float(age),
+            bmi=float(bmi),
+            sleep_hours=float(base_sleep),
+            stress_score_baseline=float(base_stress),
+            state=state_region,
+            diet_quality=diet_quality,
+            exercise_frequency=exercise_freq,
+            caffeine_intake=float(caffeine_intake),
+            water_intake_liters=float(water_intake),
+            alcohol_consumption=alcohol_stat,
+            smoking_status=smoking_stat,
+            birth_control_use=1 if bc_obs else 0,
+            pcos_diagnosed=1 if pcos_obs else 0,
+        )
+
+        cycle_obj = CurrentCycleInput(
+            cycle_length_days=float(cycle_length),
+            pain_level=float(pain_score),
+            mood_score=float(mood_score),
+            stress_score_cycle=float(cycle_stress),
+            sleep_hours_cycle=float(cycle_sleep),
+            energy_level=float(energy_score),
+            concentration_score=float(focus_score),
+            work_hours_lost=float(hours_lost),
+            cycle_phase=cycle_phase,
+            flow_level=flow_level,
+            pms_symptoms="Moderate" if pain_score > 5 else "Mild"
+        )
+
+        with st.spinner("Executing 37-feature preprocessing and Ridge regression model..."):
+            pred_result = predictor.predict(profile_obj, cycle_obj, historical_cycle=hist_input)
+
+        st.session_state.last_prediction = pred_result
+        st.session_state.last_inputs = {
+            "age": age, "bmi": bmi, "base_stress": base_stress, "base_sleep": base_sleep,
+            "cycle_length": cycle_length, "phase": cycle_phase, "flow": flow_level,
+            "pain": pain_score, "mood": mood_score, "cycle_stress": cycle_stress,
+            "cycle_sleep": cycle_sleep, "energy": energy_score, "focus": focus_score,
+            "hours_lost": hours_lost, "has_history": has_history
+        }
+
+    # E. Prediction Results Section
+    if st.session_state.last_prediction is not None:
+        render_prediction_results(st.session_state.last_prediction, st.session_state.last_inputs)
+
+
+# =============================================================================
+# VIEW 3: PREDICTION RESULTS COMPONENT
+# =============================================================================
+def render_prediction_results(result, inputs: Optional[Dict[str, Any]]):
+    """Render Section E: Prediction Results Page with scale, context, limitations, and general wellness suggestions."""
+    st.markdown("<hr style='margin: 30px 0 20px 0; border: none; border-top: 1px solid #F0E2DA;'>", unsafe_allow_html=True)
+    st.markdown("<h2>Prediction Results & Explanation</h2>", unsafe_allow_html=True)
+
+    score_val = result.predicted_next_health_score
+    diff_from_median = score_val - 8.60
+
+    if diff_from_median >= 0:
+        rel_text = f"+{diff_from_median:.2f} relative to cohort median (8.60)"
+        banner_class = "score-banner-optimal"
+    else:
+        rel_text = f"{diff_from_median:.2f} relative to cohort median (8.60)"
+        banner_class = "score-banner-moderate"
+
+    st.markdown(f"""
+    <div class="score-result-banner {banner_class}">
+        <div class="score-result-title">
+            Predicted Next-Cycle Health Score: <b>{score_val:.2f} / 10.0</b>
+        </div>
+        <div class="score-result-subtitle">
+            Scale: Continuous score from 0.0 (lowest overall wellbeing) to 10.0 (highest overall wellbeing).<br>
+            Empirical Position: <b>{rel_text}</b>.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    res_c1, res_c2 = st.columns([1, 1], gap="medium")
+
+    with res_c1:
+        st.markdown('<div class="card-surface"><div class="card-header-serif">Predicted Score Visualization</div>', unsafe_allow_html=True)
+        gauge_fig = create_gauge_chart(score_val, rel_text)
+        st.plotly_chart(gauge_fig, use_container_width=True)
+
+        st.markdown(f"""
+        <div style="font-size: 0.86rem; color: #59433F; line-height: 1.5; padding: 6px 4px;">
+            <b>Score Interpretation:</b><br>
+            The overall health score is a continuous composite indicator modeled from symptom severity, 
+            emotional balance, sleep hours, and stress continuity. In the training dataset (N=15,976), 
+            the middle 50% of records fall between 7.80 and 9.50.
+        </div>
+        """, unsafe_allow_html=True)
+        if result.warnings:
+            for w in result.warnings:
+                st.caption(f"ℹ️ {w}")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with res_c2:
+        st.markdown('<div class="card-surface"><div class="card-header-serif">Wellbeing Balance Across 6 Dimensions</div>', unsafe_allow_html=True)
+        if inputs:
+            curr_dim = {
+                "pain_level": inputs["pain"],
+                "mood_score": inputs["mood"],
+                "stress_score_cycle": inputs["cycle_stress"],
+                "sleep_hours_cycle": inputs["cycle_sleep"],
+                "energy_level": inputs["energy"],
+                "concentration_score": inputs["focus"],
+            }
+            radar_fig = create_radar_chart(curr_dim)
+            st.plotly_chart(radar_fig, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Relevant Input Summary Table
+    if inputs:
+        st.markdown('<div class="card-surface"><div class="card-header-serif">Summary of Provided Input Parameters</div>', unsafe_allow_html=True)
+        in_c1, in_c2, in_c3 = st.columns(3)
+        with in_c1:
+            st.write(f"**Age:** {inputs['age']} years")
+            st.write(f"**BMI:** {inputs['bmi']:.1f}")
+            st.write(f"**Baseline Stress:** {inputs['base_stress']:.1f} / 10")
+        with in_c2:
+            st.write(f"**Cycle Length:** {inputs['cycle_length']} days")
+            st.write(f"**Cycle Phase:** {inputs['phase']}")
+            st.write(f"**Flow Heaviness:** {inputs['flow']}")
+        with in_c3:
+            st.write(f"**Pain Intensity:** {inputs['pain']} / 10")
+            st.write(f"**Cycle Sleep:** {inputs['cycle_sleep']:.1f} hrs")
+            st.write(f"**Historical Records:** {'User Prior Cycle' if inputs['has_history'] else 'Cycle 1 Cohort Baseline'}")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # General Actionable Next Steps (Phrased as General Wellness Information)
+    st.markdown('<div class="card-surface"><div class="card-header-serif">General Wellness Observations & Next Steps</div>', unsafe_allow_html=True)
+    st.markdown("""
+    *These observations are general educational lifestyle recommendations and do not constitute medical advice or treatment.*
+    """)
+    s1, s2, s3 = st.columns(3)
+    with s1:
         st.markdown("""
-        - **Autoregressive Continuity:** Current-cycle health score and prior-cycle health score show the strongest correlation ($r = 0.67$) with next-cycle health score, demonstrating that individual cycle health is temporally continuous rather than completely stochastic.
-        - **Stress as a Primary Modulator:** Baseline stress and cycle-specific stress exert the largest negative standardized coefficients ($-0.67$ and $-0.11$) in the Ridge model.
-        - **Pain Burden:** Cycles with severe pain scores (>= 7) exhibit an average reduction of 1.4 points in the next-cycle health score.
+        <div style="background: #FDF6EE; border: 1px solid #F0D4BC; border-radius: 8px; padding: 14px; font-size: 0.86rem;">
+            <b>Rest & Recovery Rhythm</b><br>
+            Aim for consistent sleep duration (7.5–8.5 hours). Maintaining steady circadian rhythms supports pituitary gonadotropin secretion and next-cycle vitality.
+        </div>
+        """, unsafe_allow_html=True)
+    with s2:
+        st.markdown("""
+        <div style="background: #F4F7F2; border: 1px solid #C8D7C2; border-radius: 8px; padding: 14px; font-size: 0.86rem;">
+            <b>Nutritional Hydration</b><br>
+            Adequate daily water intake (2+ liters) and electrolyte-rich whole foods assist cellular hydration and support comfort throughout menstruation.
+        </div>
+        """, unsafe_allow_html=True)
+    with s3:
+        st.markdown("""
+        <div style="background: #FAF7F5; border: 1px solid #EADBCE; border-radius: 8px; padding: 14px; font-size: 0.86rem;">
+            <b>Stress Regulation Practices</b><br>
+            Because stress exerts a significant negative standardized coefficient in the model, daily down-regulation (gentle walking, mindfulness) helps protect cycle continuity.
+        </div>
+        """, unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Model Limitations Card
+    st.markdown("""
+    <div class="callout-lavender">
+        <b>Model Limitations & Clinical Boundary Notice:</b><br>
+        This prediction was generated by an experimental Ridge Regression pipeline (test R² = 0.4620, MAE = 0.6448). 
+        The model has not been clinically validated on diverse real-world populations. 
+        It does not diagnose any medical condition (such as endometriosis or PCOS), does not evaluate pregnancy or maternal health, 
+        and must not be used to direct medication, contraception, or therapeutic interventions.
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# =============================================================================
+# VIEW 4: CYCLE INFORMATION
+# =============================================================================
+def render_cycle_information():
+    """Render Cycle Information page detailing biological phases and clinical red flags."""
+    st.markdown("<h1>Menstrual Cycle Information & Phases</h1>", unsafe_allow_html=True)
+    st.markdown(
+        "A healthy menstrual cycle typically ranges from 21 to 35 days and is driven by the dynamic "
+        "interplay of estrogen, progesterone, luteinizing hormone (LH), and follicle-stimulating hormone (FSH)."
+    )
+
+    c1, c2 = st.columns(2, gap="medium")
+
+    with c1:
+        st.markdown("""
+        <div class="card-surface" style="border-top: 3px solid #B97B8A;">
+            <div class="card-header-serif">1. Menstrual Phase (Days 1–5)</div>
+            <p style="font-size: 0.9rem; line-height: 1.5;">
+                Estrogen and progesterone drop to baseline levels, initiating the shedding of the uterine lining.
+            </p>
+            <ul style="font-size: 0.85rem; line-height: 1.55; padding-left: 18px;">
+                <li><b>Physiological Focus:</b> Restorative recovery, iron replenishment, gentle movement.</li>
+                <li><b>Nutritional Support:</b> Warm broths, dark leafy greens, hydration.</li>
+                <li><b>Comfort Measures:</b> Gentle heat application, magnesium, restorative breathing.</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("""
+        <div class="card-surface" style="border-top: 3px solid #D99AA5;">
+            <div class="card-header-serif">2. Follicular Phase (Days 6–13)</div>
+            <p style="font-size: 0.9rem; line-height: 1.5;">
+                FSH stimulates ovarian follicles; dominant follicle produces ascending estrogen, thickening the endometrium.
+            </p>
+            <ul style="font-size: 0.85rem; line-height: 1.55; padding-left: 18px;">
+                <li><b>Physiological Focus:</b> Rising energy, cognitive clarity, endurance building.</li>
+                <li><b>Nutritional Support:</b> Complex carbohydrates, sprouts, fermented foods.</li>
+                <li><b>Activity Alignment:</b> Strength training, aerobic conditioning, creative focus.</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with c2:
+        st.markdown("""
+        <div class="card-surface" style="border-top: 3px solid #A8B8A0;">
+            <div class="card-header-serif">3. Ovulatory Phase (Days 14–16)</div>
+            <p style="font-size: 0.9rem; line-height: 1.5;">
+                Estrogen peak triggers a sharp LH surge, releasing the mature ovum from the ovary into the fallopian tube.
+            </p>
+            <ul style="font-size: 0.85rem; line-height: 1.55; padding-left: 18px;">
+                <li><b>Physiological Focus:</b> Peak metabolic rate, communication, stamina.</li>
+                <li><b>Nutritional Support:</b> Antioxidant-rich berries, zinc, fiber for estrogen metabolism.</li>
+                <li><b>Activity Alignment:</b> High-intensity interval training, collaborative projects.</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("""
+        <div class="card-surface" style="border-top: 3px solid #C97A3E;">
+            <div class="card-header-serif">4. Luteal Phase (Days 17–28)</div>
+            <p style="font-size: 0.9rem; line-height: 1.5;">
+                The ruptured follicle transforms into the corpus luteum, secreting progesterone to support potential implantation.
+            </p>
+            <ul style="font-size: 0.85rem; line-height: 1.55; padding-left: 18px;">
+                <li><b>Physiological Focus:</b> Slower pacing, nervous system regulation, sleep protection.</li>
+                <li><b>Nutritional Support:</b> Magnesium-dense seeds, root vegetables, adequate protein.</li>
+                <li><b>Activity Alignment:</b> Moderate pilates, nature walks, calming evening wind-downs.</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown('<div class="card-surface"><div class="card-header-serif">🩺 When to Seek Medical Attention (Red Flag Symptoms)</div>', unsafe_allow_html=True)
+    st.markdown("""
+    Please seek evaluation from a certified gynecologist, endocrinologist, or healthcare provider if you experience:
+    - **Debilitating Dysmenorrhea:** Severe pelvic pain that prevents normal daily activities, does not respond to standard pain relief, or worsens progressively.
+    - **Menorrhagia:** Soaking through one or more tampons or pads every hour for several consecutive hours, or passing blood clots larger than a quarter.
+    - **Significant Irregularity:** Cycles consistently shorter than 21 days or longer than 35 days, or bleeding episodes between cycles.
+    - **Amenorrhea:** Absence of menstrual periods for three or more consecutive cycles without pregnancy.
+    - **Severe Luteal Dysphoria:** Overwhelming mood swings, extreme irritability, or depressive symptoms during the luteal phase (possible PMDD).
+    """)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+# =============================================================================
+# VIEW 5: MODEL INSIGHTS
+# =============================================================================
+def render_model_insights():
+    """Render technical model card, evaluation benchmarks, and leakage audit verification."""
+    st.markdown("<h1>Model Insights & Technical Architecture</h1>", unsafe_allow_html=True)
+    st.markdown(
+        "HERAI applies a 37-feature Ridge Regression pipeline trained on 15,976 evaluated cycles. "
+        "The model was selected through rigorous multi-model benchmarking and strict train/test user isolation."
+    )
+
+    m_c1, m_c2 = st.columns([1.1, 0.9], gap="medium")
+
+    with m_c1:
+        st.markdown('<div class="card-surface"><div class="card-header-serif">Regression Benchmark Evaluation</div>', unsafe_allow_html=True)
+        bench_df = pd.DataFrame([
+            {
+                "Candidate Model": "Ridge Regression (42 features)",
+                "Test MAE": "0.6452",
+                "Test RMSE": "0.8029",
+                "Test R²": "0.4616",
+                "Status": "Evaluated"
+            },
+            {
+                "Candidate Model": "Random Forest (42 features)",
+                "Test MAE": "0.6550",
+                "Test RMSE": "0.8130",
+                "Test R²": "0.4480",
+                "Status": "Evaluated"
+            },
+            {
+                "Candidate Model": "Ridge Without Audited Features (37 features)",
+                "Test MAE": "0.6448",
+                "Test RMSE": "0.8025",
+                "Test R²": "0.4620",
+                "Status": "👑 Selected Production Model"
+            },
+            {
+                "Candidate Model": "Dummy Mean Baseline",
+                "Test MAE": "0.9113",
+                "Test RMSE": "1.0942",
+                "Test R²": "-0.0000",
+                "Status": "Null Baseline"
+            }
+        ])
+        st.dataframe(bench_df, hide_index=True, use_container_width=True)
+
+        st.markdown("""
+        **Rationale for 37-Feature Model Selection:**
+        - **Invasive Marker Elimination:** Drops `estrogen_pgml`, `progesterone_ngml`, and `ovulation_result`, which require clinical venipuncture or specialized testing unavailable in routine user monitoring.
+        - **Lookahead Bias Prevention:** Drops `prepared_before_period` and `log_consistency_score`.
+        - **Performance Parity:** Achieved the lowest Mean Absolute Error ($0.6448$) and highest coefficient of determination ($R^2 = 0.4620$) on unseen test users.
         """)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # =========================================================================
-    # TAB 3: MODEL TRANSPARENCY & EVIDENCE
-    # =========================================================================
-    with tab_transparency:
-        st.markdown("### Model Architecture, Evaluation & Audit Proof")
-        st.markdown(
-            "HERAI prioritizes transparency. Below are the verified empirical benchmarks, "
-            "feature selections, and data leakage safeguards."
-        )
-
-        mod_c1, mod_c2 = st.columns([1, 1], gap="medium")
-
-        with mod_c1:
-            st.markdown('<div class="herai-card"><div class="herai-card-title">Empirical Model Comparison</div>', unsafe_allow_html=True)
-            benchmarks_table = pd.DataFrame([
-                {
-                    "Model": "Ridge Regression (42 features)",
-                    "MAE": 0.6452,
-                    "RMSE": 0.8029,
-                    "R² Score": 0.4616,
-                    "Selection Note": "Included invasive lab and lookahead features"
-                },
-                {
-                    "Model": "Random Forest (42 features)",
-                    "MAE": 0.6550,
-                    "RMSE": 0.8130,
-                    "R² Score": 0.4480,
-                    "Selection Note": "Tree ensemble; slightly lower generalization"
-                },
-                {
-                    "Model": "Ridge Without Audited Features (37 features)",
-                    "MAE": 0.6448,
-                    "RMSE": 0.8025,
-                    "R² Score": 0.4620,
-                    "Selection Note": "👑 Selected Production Model (Practical & Ethical)"
-                },
-                {
-                    "Model": "Dummy Mean Baseline",
-                    "MAE": 0.9113,
-                    "RMSE": 1.0942,
-                    "R² Score": -0.0000,
-                    "Selection Note": "Null model predicting training mean"
-                }
-            ])
-            st.dataframe(benchmarks_table, hide_index=True, use_container_width=True)
-
-            st.markdown("""
-            **Justification for the 37-Feature Model:**
-            1. **Excludes Invasive Biomarkers:** Drops `estrogen_pgml`, `progesterone_ngml`, and `ovulation_result` (which require clinical blood draws unavailable in self-monitoring).
-            2. **Excludes Lookahead Features:** Drops `prepared_before_period` and `log_consistency_score`.
-            3. **Maintains Top Generalization:** Achieved identical-to-better test performance ($R^2 = 0.4620$, MAE $= 0.6448$) on unseen user splits.
-            """)
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        with mod_c2:
-            st.markdown('<div class="herai-card"><div class="herai-card-title">Standardized Model Weights</div>', unsafe_allow_html=True)
-            names_sample = [
-                "Baseline Stress Score", "Overall Health Score", "Previous Health Score",
-                "Pain Level", "Previous Pain Level", "PCOS History", "Daily Sleep Hours",
-                "Previous Stress Score", "Cycle Stress Score", "Work Hours Lost"
-            ]
-            weights_sample = [-0.672, 0.453, 0.406, -0.291, -0.250, -0.165, 0.151, -0.137, -0.113, -0.095]
-            weights_fig = create_feature_importance_chart(names_sample, weights_sample, top_n=10)
-            st.plotly_chart(weights_fig, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        st.markdown('<div class="herai-card"><div class="herai-card-title">Data Leakage Audit & Verification Report</div>', unsafe_allow_html=True)
-        st.markdown("""
-        - **Target Alignment:** Evaluated across all 15,976 records with **0 mismatches** (`next_health_score == overall_health_score.shift(-1)` within `user_id`).
-        - **User-Grouped Split:** Data partitioned with `GroupShuffleSplit` (1,600 training users, 400 test users) ensuring **zero user overlap**.
-        - **Pipeline Encapsulation:** Imputation medians and scaling parameters are learned strictly within the Scikit-learn Pipeline on training folds only.
-        """)
+    with m_c2:
+        st.markdown('<div class="card-surface"><div class="card-header-serif">Standardized Feature Weights</div>', unsafe_allow_html=True)
+        feat_names = [
+            "Baseline Stress", "Current Overall Health", "Previous Health Score",
+            "Pain Level", "Previous Pain Level", "PCOS History", "Sleep Hours",
+            "Previous Stress", "Cycle Stress", "Work Hours Lost"
+        ]
+        feat_weights = [-0.672, 0.453, 0.406, -0.291, -0.250, -0.165, 0.151, -0.137, -0.113, -0.095]
+        fig_imp = create_feature_importance_chart(feat_names, feat_weights, top_n=10)
+        st.plotly_chart(fig_imp, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # =========================================================================
-    # TAB 4: CYCLE HEALTH KNOWLEDGE
-    # =========================================================================
-    with tab_education:
-        st.markdown("### Cycle Health Knowledge & Observational Guide")
-        st.markdown(
-            "Understanding how menstrual phases interact with neuroendocrine function helps "
-            "contextualize fluctuations in pain sensitivity, emotional resilience, and sleep patterns."
-        )
+    st.markdown('<div class="card-surface"><div class="card-header-serif">Data Leakage Audit & Preprocessing Integrity</div>', unsafe_allow_html=True)
+    st.markdown("""
+    - **Target Alignment:** Evaluated across 15,976 records with **0 mismatches** (`next_health_score == overall_health_score.shift(-1)` within `user_id`).
+    - **User Isolation:** `GroupShuffleSplit` strictly splits all cycles belonging to the same user into either the training fold (1,600 users) or test fold (400 users), guaranteeing **zero user overlap**.
+    - **In-Pipeline Imputation:** Preprocessing median imputers (`SimpleImputer`) and scalers (`StandardScaler`) are encapsulated inside the Scikit-learn Pipeline and fitted exclusively on training folds.
+    """)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-        p_cols = st.columns(4)
 
-        with p_cols[0]:
-            st.markdown("""
-            <div class="herai-card" style="border-top: 3px solid #B97B8A; height: 100%;">
-                <h4 style="font-family: 'DM Serif Display', serif; color: #59433F; margin-bottom: 6px;">1. Menstrual Phase</h4>
-                <div style="font-size: 0.8rem; font-weight: 600; color: #B97B8A; margin-bottom: 8px;">Days 1–5 (Hormones at Baseline)</div>
-                <ul style="font-size: 0.85rem; padding-left: 18px; margin-bottom: 0;">
-                    <li><b>Focus:</b> Rest, restorative recovery, hydration.</li>
-                    <li><b>Nutrition:</b> Iron-rich foods, warm soups, mineral hydration.</li>
-                    <li><b>Activity:</b> Gentle walking, breathwork, warm thermal packs.</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
+# =============================================================================
+# VIEW 6: ABOUT
+# =============================================================================
+def render_about():
+    """Render Project Background, Architecture, Privacy Policy, and Disclaimers."""
+    st.markdown("<h1>About HERAI</h1>", unsafe_allow_html=True)
+    st.markdown(
+        "HERAI is an open-source machine learning and healthcare data-science research prototype "
+        "designed to explore how self-reported menstrual cycle observations can predict short-term cycle wellbeing."
+    )
 
-        with p_cols[1]:
-            st.markdown("""
-            <div class="herai-card" style="border-top: 3px solid #D99AA5; height: 100%;">
-                <h4 style="font-family: 'DM Serif Display', serif; color: #59433F; margin-bottom: 6px;">2. Follicular Phase</h4>
-                <div style="font-size: 0.8rem; font-weight: 600; color: #D99AA5; margin-bottom: 8px;">Days 6–13 (Estrogen Ascending)</div>
-                <ul style="font-size: 0.85rem; padding-left: 18px; margin-bottom: 0;">
-                    <li><b>Focus:</b> Cognitive energy, endurance, stamina building.</li>
-                    <li><b>Nutrition:</b> Complex carbohydrates, sprouts, leafy greens.</li>
-                    <li><b>Activity:</b> Resistance training, aerobic conditioning.</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
+    ab_c1, ab_c2 = st.columns(2, gap="medium")
 
-        with p_cols[2]:
-            st.markdown("""
-            <div class="herai-card" style="border-top: 3px solid #A8B8A0; height: 100%;">
-                <h4 style="font-family: 'DM Serif Display', serif; color: #59433F; margin-bottom: 6px;">3. Ovulatory Phase</h4>
-                <div style="font-size: 0.8rem; font-weight: 600; color: #A8B8A0; margin-bottom: 8px;">Days 14–16 (Estrogen & LH Peak)</div>
-                <ul style="font-size: 0.85rem; padding-left: 18px; margin-bottom: 0;">
-                    <li><b>Focus:</b> Peak metabolic capacity, social focus.</li>
-                    <li><b>Nutrition:</b> Antioxidant-dense berries, zinc-rich seeds.</li>
-                    <li><b>Activity:</b> High-intensity training, social collaboration.</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with p_cols[3]:
-            st.markdown("""
-            <div class="herai-card" style="border-top: 3px solid #C97A3E; height: 100%;">
-                <h4 style="font-family: 'DM Serif Display', serif; color: #59433F; margin-bottom: 6px;">4. Luteal Phase</h4>
-                <div style="font-size: 0.8rem; font-weight: 600; color: #C97A3E; margin-bottom: 8px;">Days 17–28 (Progesterone Dominant)</div>
-                <ul style="font-size: 0.85rem; padding-left: 18px; margin-bottom: 0;">
-                    <li><b>Focus:</b> Boundary setting, stress mitigation, sleep.</li>
-                    <li><b>Nutrition:</b> Magnesium-dense foods, fiber, complex grains.</li>
-                    <li><b>Activity:</b> Moderate pilates, nature walks, calming routines.</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
-
-        st.markdown('<div class="herai-card"><div class="herai-card-title">When to Seek Medical Attention (Red Flag Symptoms)</div>', unsafe_allow_html=True)
+    with ab_c1:
         st.markdown("""
-        Please schedule a consultation with a certified gynecologist or physician if you notice:
-        - **Intractable Pelvic Pain:** Severe dysmenorrhea unresponsive to standard OTC analgesics, radiating down thighs, or raising suspicion of endometriosis.
-        - **Menorrhagia (Heavy Bleeding):** Bleeding requiring pad/tampon changes every 1–2 hours, or passing blood clots larger than a quarter.
-        - **Oligomenorrhea / Amenorrhea:** Cycles shorter than 21 days, longer than 35 days, or cycle cessation for 3+ consecutive months.
-        - **PMDD or Severe Dysphoria:** Severe luteal-phase depressive mood shifts that significantly impair work, relationships, or emotional safety.
-        """)
-        st.markdown('</div>', unsafe_allow_html=True)
+        <div class="card-surface">
+            <div class="card-header-serif">Project Purpose & Origins</div>
+            <p style="font-size: 0.9rem; line-height: 1.55;">
+                Menstrual health remains historically under-represented in statistical predictive modeling. 
+                HERAI demonstrates an end-to-end data science lifecycle: from raw record ingestion, schema validation, 
+                and chronological lag feature engineering, to model comparison, leakage verification, and ethical inference.
+            </p>
+            <p style="font-size: 0.9rem; line-height: 1.55;">
+                <b>Dataset Composition:</b> 17,976 raw cycle records across 2,000 unique user profiles, yielding 15,976 training records with verified next-cycle targets.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
 
-    # Legal & Privacy Disclaimer Card
+    with ab_c2:
+        st.markdown("""
+        <div class="card-surface">
+            <div class="card-header-serif">Data Privacy & Security</div>
+            <p style="font-size: 0.9rem; line-height: 1.55;">
+                <b>Local In-Memory Execution:</b> All user entries submitted through this web interface are processed 
+                entirely in-memory within your local Python runtime. 
+            </p>
+            <p style="font-size: 0.9rem; line-height: 1.55;">
+                <b>Zero Stranger-Data Substitution:</b> The prediction pipeline never borrows or copies records from other individuals in the dataset. 
+                For first-time users, learned cohort medians from the training split serve as documented reference baselines.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
     st.markdown("""
     <div class="disclaimer-card">
-        <b>Ethical & Regulatory Disclaimer:</b> HERAI is an educational machine-learning demonstration and predictive exploration prototype. 
-        It is not a diagnostic device, clinical decision-support tool, contraceptive planner, or medical device. 
-        Predictions reflect statistical estimations derived from historical observational cohort data and must not be used for diagnosis, medical treatment, or contraception.
-        <br><br>
-        <b>Data Privacy & Security:</b> Input data provided in this session is processed strictly in-memory during runtime on your local device. 
-        Zero personal health information is stored, transmitted to external servers, or sold.
+        <b>Clinical and Legal Disclaimer:</b> HERAI is an educational demonstration and research prototype. 
+        It is not a medical device, diagnostic system, clinical decision support software, or contraceptive planner. 
+        Outputs represent statistical predictions derived from observational data patterns and must not be used for diagnosis, medical treatment, or contraception planning.
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# =============================================================================
+# MAIN APP ROUTER
+# =============================================================================
+def main():
+    render_app_header()
+    predictor = get_predictor()
+    cohort_df = get_cohort_dataset()
+
+    if st.session_state.current_page == "Dashboard":
+        render_dashboard(cohort_df)
+    elif st.session_state.current_page == "Health Prediction":
+        render_health_prediction(predictor)
+    elif st.session_state.current_page == "Cycle Information":
+        render_cycle_information()
+    elif st.session_state.current_page == "Model Insights":
+        render_model_insights()
+    elif st.session_state.current_page == "About":
+        render_about()
+    else:
+        render_dashboard(cohort_df)
+
+    # Persistent calm footer
+    st.markdown("""
+    <div style="text-align: center; font-size: 0.78rem; color: #8F7B76; margin-top: 40px; padding-top: 16px; border-top: 1px solid #F0E2DA;">
+        HERAI — Menstrual Health Intelligence Prototype &nbsp;|&nbsp; Educational & Data-Driven ML System &nbsp;|&nbsp; Non-Diagnostic
     </div>
     """, unsafe_allow_html=True)
 
