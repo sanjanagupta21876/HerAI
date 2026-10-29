@@ -1,8 +1,10 @@
 import pandas as pd
 
 # Load the raw datasets
-period = pd.read_csv("data/raw/Period_Log.csv")
-profile = pd.read_csv("data/raw/User_Profile.csv")
+from pathlib import Path
+ROOT = Path(__file__).resolve().parent.parent
+period = pd.read_csv(ROOT / "data" / "raw" / "Period_Log.csv")
+profile = pd.read_csv(ROOT / "data" / "raw" / "User_Profile.csv")
 
 period["start_date"] = pd.to_datetime(
     period["start_date"],
@@ -87,7 +89,7 @@ for col in profile.select_dtypes(include="object").columns:
     print(f"\n{col}:")
     print(profile[col].value_counts(dropna=False))
 
-    print("\n========== DATE CHECK ==========")
+print("\n========== DATE CHECK ==========")
 
 print("Date type:")
 print(period["start_date"].dtype)

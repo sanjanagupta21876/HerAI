@@ -2,27 +2,34 @@
 
 ## 1. Project Overview
 
-HERAI is a machine learning project designed to predict a user's next-cycle overall health score using menstrual-cycle information, lifestyle factors, and previous-cycle health data.
+HERAI is a machine learning system designed to predict a user's next-cycle overall health score using menstrual-cycle observations, demographic and lifestyle factors, and prior-cycle health data.
 
-The project demonstrates data preprocessing, feature engineering, regression model training, model evaluation, and prediction through user input.
+The project demonstrates end-to-end data validation, feature engineering, regression model training, model comparison, privacy-preserving inference, and automated testing.
 
-**Note:** HERAI is an educational prototype and is not a medically validated diagnostic or prediction system.
+**Note:** HERAI is an educational prototype and is not a medically validated diagnostic or clinical decision-making system.
+
+---
 
 ## 2. Objectives
 
-- Analyze menstrual-cycle and user-profile data.
-- Create features using current and previous-cycle information.
-- Train and compare machine learning regression models.
-- Predict the next-cycle overall health score.
-- Evaluate model performance using standard regression metrics.
+- Validate raw menstrual-cycle logs and user profile schemas before processing.
+- Prevent data leakage by isolating users across training and testing splits (`GroupShuffleSplit`).
+- Engineer chronological lag features and align next-cycle prediction targets.
+- Train and compare regression models (Ridge Regression, Random Forest).
+- Provide a privacy-preserving inference engine that predicts next-cycle health using **only** user-owned data and learned population baseline defaults (without borrowing stranger records).
+- Deliver automated unit and integration tests with `pytest`.
+
+---
 
 ## 3. Technology Stack
 
-- **Language:** Python
-- **Libraries:** Pandas, NumPy, Scikit-learn, Joblib
-- **Development Environment:** Visual Studio Code
-- **Data Storage:** CSV files
-- **Model Type:** Ridge Regression
+- **Language:** Python (3.9+)
+- **Core Libraries:** Pandas, NumPy, Scikit-learn, Joblib, Pydantic
+- **Testing:** Pytest
+- **Data Storage:** Validated CSV files
+- **Selected Model:** 37-feature Ridge Regression Pipeline
+
+---
 
 ## 4. Project Structure
 
@@ -30,114 +37,136 @@ The project demonstrates data preprocessing, feature engineering, regression mod
 HERAI/
 ├── data/
 │   ├── raw/
-│   │   ├── Period_Log.csv
-│   │   └── User_Profile.csv
+│   │   ├── Period_Log.csv          # 17,976 raw menstrual cycle records
+│   │   └── User_Profile.csv        # 2,000 raw user demographic & lifestyle records
 │   └── processed/
-│       ├── merged_data.csv
-│       ├── engineered_data.csv
-│       └── training_data.csv
+│       ├── merged_data.csv         # Validated many-to-one merged dataset
+│       ├── engineered_data.csv     # Chronological lag features and aligned target
+│       └── training_data.csv       # Filtered training dataset (15,976 records)
 ├── models/
-│   ├── herai_ridge_model.pkl
-│   └── herai_ridge_37_features.pkl
+│   ├── herai_ridge_model.pkl       # 42-feature Ridge pipeline
+│   └── herai_ridge_37_features.pkl # 37-feature Ridge production model
 ├── src/
-│   ├── 01_inspect_data.py
-│   ├── 02_merge_data.py
-│   ├── 03_create_features.py
-│   ├── 04_prepare_data.py
-│   ├── 05_train_model.py
-│   ├── 06_predict.py
-│   ├── 07_user_input.py
-│   ├── 08_feature_leakage_audit.py
+│   ├── herai/                      # Reusable core Python package
+│   │   ├── __init__.py
+│   │   ├── config.py               # Paths, feature sets, validation bounds
+│   │   ├── data.py                 # Schema validation, merging, lag generation
+│   │   ├── models.py               # Pipelines, user-grouped splitting, evaluation
+│   │   └── inference.py            # Ethical inference engine & input validation
+│   ├── 01_inspect_data.py          # Exploratory data analysis & health score formula audit
+│   ├── 02_merge_data.py            # Schema validation and dataset merge
+│   ├── 03_create_features.py       # Chronological sort and lag feature creation
+│   ├── 04_prepare_data.py          # Training dataset preparation
+│   ├── 05_train_model.py           # Trains 42-feature Ridge model
+│   ├── 06_compare_models.py        # Compares Ridge vs RF vs 37-feature Ridge
+│   ├── 06_predict.py               # Programmatic & sample prediction demonstration
+│   ├── 07_user_input.py            # Interactive CLI prediction
+│   ├── 08_feature_leakage_audit.py # Target leakage verification
+│   ├── inspect_features.py         # Feature timing exploration
 │   └── src/
-│       └── 06_compare_models.py
+│       └── 06_compare_models.py    # Backward-compatibility forwarding stub
+├── tests/
+│   └── test_herai.py               # Automated pytest suite
+├── pyproject.toml                  # Package configuration & pytest settings
+├── requirements.txt                # Dependency manifest
 └── README.md
 ```
+
+---
 
 ## 5. Dataset and Preprocessing
 
 The project uses two raw datasets:
+- `Period_Log.csv` (17,976 records, 21 columns) — menstrual cycle dates, symptom severity, mood, sleep, pain, and health scores.
+- `User_Profile.csv` (2,000 records, 14 columns) — demographics, BMI, diet quality, exercise frequency, and baseline stress.
 
-- `Period_Log.csv` — menstrual-cycle records and related health information.
-- `User_Profile.csv` — user-level demographic and lifestyle information.
+### Preprocessing & Leakage Safeguards
+1. **Schema Validation:** Verifies that all required fields are present and confirms `user_id` is unique in `User_Profile.csv` and `(user_id, cycle_number)` is unique in `Period_Log.csv`.
+2. **Chronological Ordering:** Sorts each user's records strictly by `(user_id, start_date)` before generating lag features.
+3. **Lag Feature Engineering:** Computes previous-cycle metrics (`overall_health_score.shift(1)`, `cycle_length_days.shift(1)`, `pain_level.shift(1)`, etc.).
+4. **Target Alignment:** The prediction target `next_health_score` is defined strictly as `overall_health_score.shift(-1)`. For the terminal cycle of each user, `next_health_score` is `NaN` and is excluded from training.
+5. **No Data Leakage:** Preprocessing imputers (`SimpleImputer`) and scalers (`StandardScaler`) are encapsulated inside Scikit-learn `Pipeline` objects so that statistics are fitted exclusively on training folds during cross-validation.
 
-The datasets are merged using `user_id`. Feature engineering creates previous-cycle features and aligns the target with the following cycle's overall health score.
+---
 
-The merged dataset contains 17,976 records. After removing records without a next-cycle target, 15,976 records remain for model evaluation and training.
+## 6. Model Comparison
 
-The original dataset's source and generation method should be verified before making claims about its representativeness.
+Models evaluated on the same 80/20 user-grouped split (`GroupShuffleSplit`, 1,600 train users, 400 test users):
 
-## 6. Machine Learning Workflow
+| Model | MAE | RMSE | R² Score | Description |
+|---|---:|---:|---:|---|
+| Ridge Regression (42 features) | 0.6452 | 0.8029 | 0.4616 | Includes all features (some lab/inaccessible at home) |
+| Random Forest (42 features) | 0.6550 | 0.8130 | 0.4480 | Non-linear tree ensemble |
+| **Ridge Without Audited Features (37 features)** | **0.6448** | **0.8025** | **0.4620** | **Selected production candidate** (excludes lab/timing features) |
 
-1. Inspect the raw datasets.
-2. Merge cycle records with user profiles.
-3. Engineer current-cycle and previous-cycle features.
-4. Prepare the data for model training.
-5. Split data by user to keep users separate between training and testing.
-6. Train and compare regression models.
-7. Save the selected model.
-8. Accept user inputs and generate a prototype prediction.
+---
 
-## 7. Model Comparison
+## 7. How to Run the Project
 
-Three regression models were evaluated using the same user-grouped train/test split.
+### 7.1 Setup
 
-| Model | MAE | RMSE | R² Score |
-|---|---:|---:|---:|
-| Ridge Regression | 0.6452 | 0.8029 | 0.4616 |
-| Random Forest | 0.6536 | 0.8116 | 0.4498 |
-| Ridge Regression (37 features) | 0.6448 | 0.8025 | 0.4620 |
-
-The 37-feature Ridge Regression model achieved the best results among these candidates on this test split.
-
-- **MAE:** Mean Absolute Error; lower is better.
-- **RMSE:** Root Mean Squared Error; lower is better.
-- **R²:** Measures the proportion of target variance explained by the model; higher is generally better.
-
-These results are preliminary and do not establish clinical reliability or performance on new real-world populations.
-
-## 8. How to Run the Project
-
-Open a terminal in the HERAI project root directory.
-
-Install the required libraries if needed:
+Install dependencies:
 
 ```bash
-pip install pandas numpy scikit-learn joblib
+pip install -r requirements.txt
 ```
 
-Run the scripts in the appropriate order when rebuilding the pipeline:
+### 7.2 Run the Pipeline
+
+Execute the pipeline in sequential order:
 
 ```bash
+# 1. Inspect raw data schemas and correlations
 python src/01_inspect_data.py
+
+# 2. Validate schemas and merge raw datasets
 python src/02_merge_data.py
+
+# 3. Chronologically sort and engineer lag features
 python src/03_create_features.py
+
+# 4. Prepare training dataset
 python src/04_prepare_data.py
+
+# 5. Train Ridge baseline model
 python src/05_train_model.py
+
+# 6. Verify zero target leakage
 python src/08_feature_leakage_audit.py
-python src/src/06_compare_models.py
+
+# 7. Compare models and save selected 37-feature Ridge model
+python src/06_compare_models.py
+
+# 8. Run prediction on sample data
+python src/06_predict.py
+
+# 9. Run interactive personalized user prediction
 python src/07_user_input.py
 ```
 
-The model comparison script saves `models/herai_ridge_37_features.pkl`, which is loaded by the user-input prediction script.
+### 7.3 Run Automated Tests
 
-Run the pipeline from the project root so relative paths resolve correctly. The comparison script should be rerun after retraining if you want to refresh the selected 37-feature model.
+Execute the full test suite with:
 
-## 9. Limitations
+```bash
+pytest
+```
 
-- The model has not been clinically validated.
-- The source and generation process of the dataset need verification.
-- Some user-input prediction features still come from a sample dataset row, so the current prediction is not fully personalized.
-- The evaluation uses a user-grouped random split rather than a separate future-time evaluation.
-- The output must not be used for diagnosis, treatment, or medical decisions.
+---
 
-## 10. Future Improvements
+## 8. Ethical Inference & Privacy Safeguards
 
-- Collect and validate suitable real-world data with appropriate consent and privacy safeguards.
-- Build a prediction pipeline that uses only information genuinely available at prediction time.
-- Replace sample-row features with complete user-specific inputs or a principled missing-feature strategy.
-- Add temporal validation and further model evaluation.
-- Develop a user-friendly interface after the prediction pipeline is improved.
+Prior prototypes relied on copying an arbitrary stranger's data row from the training set to fill missing features. **This defect has been completely resolved.**
 
-## 11. Conclusion
+HERAI's inference pipeline:
+- **Never copies or borrows other users' records.**
+- Validates all user inputs against domain boundaries (e.g. age: 12–100, BMI: 10–70, pain/stress/mood: 0–10).
+- If a user provides historical cycle records, features are calculated strictly from their own data.
+- For first-time users (Cycle 1 / no historical cycle logs), the pipeline applies documented cohort baseline defaults learned by the preprocessing pipeline from the training set, clearly labeling this in the prediction output.
 
-HERAI demonstrates an end-to-end machine learning workflow for a menstrual-health score prediction prototype, including data merging, feature engineering, model comparison, evaluation, and user-input inference. Further validation and improvements are required before it can support reliable personalized predictions.
+---
+
+## 9. Limitations & Medical Disclaimer
+
+- **Non-Clinical Prototype:** HERAI is an educational demonstration and has not been clinically validated.
+- **Medical Decisions:** The outputs must never be used for diagnosis, medical treatment, or contraception planning.

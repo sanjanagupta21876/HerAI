@@ -1,7 +1,9 @@
 
 import pandas as pd
 
-df = pd.read_csv("data/raw/Period_Log.csv")
+from pathlib import Path
+ROOT = Path(__file__).resolve().parent.parent
+df = pd.read_csv(ROOT / "data" / "raw" / "Period_Log.csv")
 
 df = df.sort_values(
     ["user_id", "start_date"]

@@ -1,270 +1,102 @@
+"""HERAI Model Training Pipeline.
 
-import pandas as pd
+Trains the 42-feature Ridge Regression pipeline using user-grouped train/test splitting.
+Saves the serialized pipeline to models/herai_ridge_model.pkl.
+"""
+
 from pathlib import Path
-
-print("\n========== HERAI MODEL TRAINING ==========")
-
-# Locate the project directory
-ROOT = Path(__file__).resolve().parent.parent
-
-# Load the engineered dataset
-data_path = ROOT / "data" / "processed" / "engineered_data.csv"
-df = pd.read_csv(data_path)
-
-# Remove rows without the prediction target
-df = df.dropna(subset=["next_health_score"]).copy()
-
-print("Dataset shape:", df.shape)
-print("Number of unique users:", df["user_id"].nunique())
-
-print("\nAvailable columns:")
-print(df.columns.tolist())
-
-print("\nTarget variable:")
-print("next_health_score")
-
-print("\nTarget summary:")
-print(df["next_health_score"].describe())
-
-
-print("\n========== SELECT INPUT FEATURES ==========")
-
-target_column = "next_health_score"
-
-excluded_columns = [
-    "user_id",
-    "start_date",
-    "next_health_score",
-    "cycle_number"
-]
-
-X = df.drop(columns=excluded_columns)
-y = df[target_column]
-
-print("Number of input features:", X.shape[1])
-print("Number of target values:", y.shape[0])
-
-print("\nInput feature columns:")
-print(X.columns.tolist())
-
-
-print("\n========== CHECK POSSIBLE TARGET LEAKAGE ==========")
-
-print("Target:", target_column)
-print("Current health score included:", "overall_health_score" in X.columns)
-print("Next health score included:", "next_health_score" in X.columns)
-
-print("\nPotentially time-sensitive features:")
-for col in [
-    "estrogen_pgml",
-    "progesterone_ngml",
-    "ovulation_result",
-    "log_consistency_score",
-    "prepared_before_period"
-]:
-    if col in X.columns:
-        print("-", col)
-
-print("\nTarget shape:", y.shape)
-
-
-
-from sklearn.model_selection import GroupShuffleSplit
-
-print("\n========== SPLIT DATA ==========")
-
-# Keep all cycles of a user in the same split
-groups = df["user_id"]
-
-splitter = GroupShuffleSplit(
-    n_splits=1,
-    test_size=0.2,
-    random_state=42
-)
-
-train_indices, test_indices = next(
-    splitter.split(X, y, groups=groups)
-)
-
-X_train = X.iloc[train_indices]
-X_test = X.iloc[test_indices]
-
-y_train = y.iloc[train_indices]
-y_test = y.iloc[test_indices]
-
-print("Training features shape:", X_train.shape)
-print("Testing features shape:", X_test.shape)
-print("Training target shape:", y_train.shape)
-print("Testing target shape:", y_test.shape)
-
-print("Unique users in training:", groups.iloc[train_indices].nunique())
-print("Unique users in testing:", groups.iloc[test_indices].nunique())
-
-# Verify that no user occurs in both sets
-train_users = set(groups.iloc[train_indices])
-test_users = set(groups.iloc[test_indices])
-
-print("Users appearing in both sets:", len(train_users & test_users))
-
-
-
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.linear_model import Ridge
-
-print("\n========== BUILD PREPROCESSING PIPELINE ==========")
-
-# Identify numerical and categorical columns
-numeric_features = X.select_dtypes(include=["number"]).columns.tolist()
-categorical_features = X.select_dtypes(
-    exclude=["number"]
-).columns.tolist()
-
-print("Number of numerical features:", len(numeric_features))
-print("Number of categorical features:", len(categorical_features))
-
-# Process numerical features
-numeric_pipeline = Pipeline([
-    ("imputer", SimpleImputer(strategy="median")),
-    ("scaler", StandardScaler())
-])
-
-# Process categorical features
-categorical_pipeline = Pipeline([
-    ("imputer", SimpleImputer(strategy="most_frequent")),
-    ("encoder", OneHotEncoder(handle_unknown="ignore"))
-])
-
-# Combine both preprocessing pipelines
-preprocessor = ColumnTransformer([
-    ("numeric", numeric_pipeline, numeric_features),
-    ("categorical", categorical_pipeline, categorical_features)
-])
-
-# Combine preprocessing and Ridge Regression
-model = Pipeline([
-    ("preprocessor", preprocessor),
-    ("regressor", Ridge(alpha=1.0))
-])
-
-print("Preprocessing pipeline created successfully!")
-print("Model: Ridge Regression")
-
-
-
-print("\n========== TRAIN HERAI MODEL ==========")
-
-# Train the complete pipeline using training data
-model.fit(X_train, y_train)
-
-print("Model training completed successfully!")
-
-# Generate predictions for unseen users
-y_pred = model.predict(X_test)
-
-print("\nPredictions generated successfully!")
-print("Number of predictions:", len(y_pred))
-
-# Compare actual and predicted values
-results = pd.DataFrame({
-    "Actual_Next_Health_Score": y_test.values,
-    "Predicted_Next_Health_Score": y_pred
-})
-
-print("\nSample predictions:")
-print(results.head(10).round(2))
-
-
-
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+import sys
 import numpy as np
+import pandas as pd
+from sklearn.pipeline import Pipeline
 
-print("\n========== EVALUATE HERAI MODEL ==========")
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "src"))
 
-# Calculate evaluation metrics
-mae = mean_absolute_error(y_test, y_pred)
-rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-r2 = r2_score(y_test, y_pred)
-
-print(f"Mean Absolute Error (MAE): {mae:.4f}")
-print(f"Root Mean Squared Error (RMSE): {rmse:.4f}")
-print(f"R-squared (R2): {r2:.4f}")
-
-
-
-print("\n========== BASELINE COMPARISON ==========")
-
-# Predict the average health score from the training set
-baseline_prediction = np.full(
-    shape=len(y_test),
-    fill_value=y_train.mean()
+from herai.config import (
+    ENGINEERED_DATA_PATH,
+    MODEL_RIDGE_PATH,
+    TARGET_COLUMN,
+    EXCLUDED_FROM_TRAINING,
+)
+from herai.models import (
+    split_by_user,
+    get_feature_types,
+    build_pipeline,
+    evaluate_model,
+    save_model,
 )
 
-baseline_mae = mean_absolute_error(y_test, baseline_prediction)
-baseline_rmse = np.sqrt(
-    mean_squared_error(y_test, baseline_prediction)
-)
-baseline_r2 = r2_score(y_test, baseline_prediction)
 
-print(f"Baseline MAE:  {baseline_mae:.4f}")
-print(f"Baseline RMSE: {baseline_rmse:.4f}")
-print(f"Baseline R2:   {baseline_r2:.4f}")
+def run_training() -> Pipeline:
+    """Execute model training on the 42-feature dataset with user-grouped splitting.
+    
+    Returns:
+        Pipeline: Trained scikit-learn pipeline.
+    """
+    print("\n========== HERAI MODEL TRAINING ==========")
+    print(f"Loading engineered data from: {ENGINEERED_DATA_PATH}")
 
-print("\n========== PERFORMANCE COMPARISON ==========")
-print(f"Ridge MAE:     {mae:.4f}")
-print(f"Baseline MAE:  {baseline_mae:.4f}")
-print(f"Ridge RMSE:    {rmse:.4f}")
-print(f"Baseline RMSE: {baseline_rmse:.4f}")
-print(f"Ridge R2:      {r2:.4f}")
-print(f"Baseline R2:   {baseline_r2:.4f}")
+    if not ENGINEERED_DATA_PATH.exists():
+        raise FileNotFoundError(
+            f"Engineered dataset not found at {ENGINEERED_DATA_PATH}. Run src/03_create_features.py first."
+        )
+
+    df = pd.read_csv(ENGINEERED_DATA_PATH)
+    clean_df = df.dropna(subset=[TARGET_COLUMN]).copy()
+
+    feature_cols = [c for c in clean_df.columns if c not in EXCLUDED_FROM_TRAINING]
+    print(f"Number of input features: {len(feature_cols)}")
+    print(f"Number of valid samples: {len(clean_df)}")
+    print(f"Unique users: {clean_df['user_id'].nunique()}")
+
+    # User-grouped train/test split (80/20)
+    X_train, X_test, y_train, y_test, g_train, g_test = split_by_user(
+        clean_df, feature_cols=feature_cols, test_size=0.2, random_state=42
+    )
+
+    print(f"Training set: {len(X_train)} samples across {g_train.nunique()} users.")
+    print(f"Testing set: {len(X_test)} samples across {g_test.nunique()} users.")
+    overlap = set(g_train).intersection(set(g_test))
+    print(f"User overlap between splits: {len(overlap)} (Must be 0)")
+
+    # Partition features
+    numeric_features, categorical_features = get_feature_types(X_train)
+    print(f"Numerical features: {len(numeric_features)}, Categorical features: {len(categorical_features)}")
+
+    # Build and evaluate Ridge pipeline
+    pipeline = build_pipeline(
+        numeric_features=numeric_features,
+        categorical_features=categorical_features,
+        model_type="ridge",
+        alpha=1.0,
+        random_state=42,
+    )
+
+    metrics = evaluate_model(pipeline, X_train, y_train, X_test, y_test)
+
+    print("\n========== MODEL EVALUATION (TEST SPLIT) ==========")
+    for k, v in metrics.items():
+        print(f"  {k}: {v}")
+
+    # Baseline comparison (predicting mean)
+    baseline_pred = np.full(shape=len(y_test), fill_value=float(y_train.mean()))
+    from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+    b_mae = float(mean_absolute_error(y_test, baseline_pred))
+    b_rmse = float(np.sqrt(mean_squared_error(y_test, baseline_pred)))
+    b_r2 = float(r2_score(y_test, baseline_pred))
+
+    print("\n========== DUMMY BASELINE COMPARISON ==========")
+    print(f"  Baseline MAE:  {b_mae:.4f}")
+    print(f"  Baseline RMSE: {b_rmse:.4f}")
+    print(f"  Baseline R2:   {b_r2:.4f}")
+
+    # Save trained model
+    save_model(pipeline, MODEL_RIDGE_PATH)
+    print(f"\nModel saved successfully to: {MODEL_RIDGE_PATH}")
+
+    return pipeline
 
 
-
-import joblib
-
-print("\n========== SAVE HERAI MODEL ==========")
-
-model_dir = ROOT / "models"
-model_dir.mkdir(parents=True, exist_ok=True)
-
-model_path = model_dir / "herai_ridge_model.pkl"
-
-joblib.dump(model, model_path)
-
-print("Model saved successfully!")
-print("Saved location:", model_path)
-
-
-print("\n========== TOP MODEL COEFFICIENTS ==========")
-
-# Get the preprocessing component and trained Ridge model
-preprocessor_fitted = model.named_steps["preprocessor"]
-ridge_model = model.named_steps["regressor"]
-
-# Get feature names after preprocessing
-feature_names = preprocessor_fitted.get_feature_names_out()
-
-# Create a table of coefficients
-coefficient_table = pd.DataFrame({
-    "Feature": feature_names,
-    "Coefficient": ridge_model.coef_
-})
-
-# Sort by absolute coefficient magnitude
-coefficient_table["Absolute_Coefficient"] = (
-    coefficient_table["Coefficient"].abs()
-)
-
-coefficient_table = coefficient_table.sort_values(
-    by="Absolute_Coefficient",
-    ascending=False
-)
-
-print("\nTop 15 features by absolute coefficient:")
-print(
-    coefficient_table[
-        ["Feature", "Coefficient"]
-    ].head(15).to_string(index=False)
-)
+if __name__ == "__main__":
+    run_training()

@@ -2,8 +2,10 @@
 import pandas as pd
 
 # Load the raw datasets
-period = pd.read_csv("data/raw/Period_Log.csv")
-profile = pd.read_csv("data/raw/User_Profile.csv")
+from pathlib import Path
+ROOT = Path(__file__).resolve().parent.parent
+period = pd.read_csv(ROOT / "data" / "raw" / "Period_Log.csv")
+profile = pd.read_csv(ROOT / "data" / "raw" / "User_Profile.csv")
 
 # Display basic information
 print("========== DATA LOADED SUCCESSFULLY ==========")
@@ -972,7 +974,7 @@ import os
 print("\n========== SAVE HERAI MODEL ==========")
 
 # Create models folder if it does not exist
-os.makedirs("models", exist_ok=True)
+os.makedirs(ROOT / "models", exist_ok=True)
 
 # Fit the final pipeline on the training split
 final_model = Pipeline([
@@ -985,7 +987,7 @@ final_model.fit(X_train, y_train)
 # Save preprocessing and model together
 joblib.dump(
     final_model,
-    "models/herai_ridge_model.pkl"
+    ROOT / "models" / "herai_ridge_model.pkl"
 )
 
 print("Model saved successfully!")
@@ -996,7 +998,7 @@ print("\n========== LOAD AND TEST SAVED MODEL ==========")
 
 # Load the saved pipeline
 loaded_model = joblib.load(
-    "models/herai_ridge_model.pkl"
+    ROOT / "models" / "herai_ridge_model.pkl"
 )
 
 
