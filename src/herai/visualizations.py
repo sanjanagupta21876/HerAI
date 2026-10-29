@@ -1,10 +1,11 @@
 """Interactive Plotly visualization components for the HERAI Web Application.
 
-Adheres strictly to the HERAI Phase 3 Visual Design System and Phase 5/6 requirements:
-- Colors: Warm Ivory #FFF9F5, Peach #F8E5DB, Dusty Rose #D99AA5, Muted Mauve #B97B8A,
-  Deep Cocoa #59433F, Sage Green #A8B8A0, Pale Lavender #EAE5F4, White #FFFFFF, Amber #C97A3E.
+Adheres strictly to the HERAI Visual Design System:
+- Colors: Warm Ivory #FFF9F5, Soft Peach #F8E5DB, Dusty Rose #D99AA5, Muted Mauve #B97B8A,
+  Deep Cocoa #59433F, Healthcare Sage #6E8B62, Pale Lavender #EAE5F4, White #FFFFFF, Amber #C97A3E.
+- Zero emojis: Clean typography, subtle borders, and professional health-tech visual clarity.
 - Zero invented metrics or coefficients: all data is either dynamically computed or verified from model outputs.
-- Educational cycle timeline clearly labeled as non-predictive reference.
+- Educational cycle timeline clearly labeled as non-predictive physiological reference.
 """
 
 from typing import Dict, Any, Optional, List
@@ -19,8 +20,10 @@ PALETTE = {
     "peach": "#F8E5DB",
     "dusty_rose": "#D99AA5",
     "mauve": "#B97B8A",
+    "mauve_dark": "#925363",
     "cocoa": "#59433F",
-    "sage": "#A8B8A0",
+    "cocoa_light": "#7A6560",
+    "sage": "#6E8B62",
     "lavender": "#EAE5F4",
     "white": "#FFFFFF",
     "amber": "#C97A3E",
@@ -44,35 +47,41 @@ def create_cycle_wave_hero() -> go.Figure:
         x=days,
         y=wave,
         mode="lines",
-        line=dict(color=PALETTE["mauve"], width=2.8, shape="spline"),
+        line=dict(color=PALETTE["mauve"], width=2.4, shape="spline"),
         fill="tozeroy",
-        fillcolor="rgba(217, 154, 165, 0.14)",
+        fillcolor="rgba(185, 123, 138, 0.10)",
         hoverinfo="skip",
         showlegend=False,
     ))
 
     milestone_days = [1, 7, 14, 21, 28]
-    milestone_labels = ["Day 1: Menstrual", "Day 7: Follicular", "Day 14: Ovulatory", "Day 21: Luteal", "Day 28: Cycle End"]
+    milestone_labels = [
+        "Day 1: Menstrual Phase",
+        "Day 7: Follicular Phase",
+        "Day 14: Ovulatory Phase",
+        "Day 21: Luteal Phase",
+        "Day 28: Cycle Completion"
+    ]
     milestone_y = [8.0 + 1.2 * np.sin((d - 5) / 28.0 * 2 * np.pi) + 0.3 * np.cos((d - 14) / 14.0 * 2 * np.pi) for d in milestone_days]
 
     fig.add_trace(go.Scatter(
         x=milestone_days,
         y=milestone_y,
         mode="markers+text",
-        marker=dict(size=9, color=PALETTE["mauve"], line=dict(color=PALETTE["white"], width=2)),
+        marker=dict(size=8, color=PALETTE["white"], line=dict(color=PALETTE["mauve"], width=2)),
         text=["Day 1", "Day 7", "Day 14", "Day 21", "Day 28"],
         textposition="top center",
         textfont=dict(family=FONT_SANS, size=10, color=PALETTE["cocoa"]),
         hovertext=milestone_labels,
-        hoverinfo="text",
+        hovertemplate="<b>%{hovertext}</b><extra></extra>",
         showlegend=False,
     ))
 
     fig.update_layout(
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
-        height=150,
-        margin=dict(l=15, r=15, t=20, b=20),
+        height=145,
+        margin=dict(l=15, r=15, t=18, b=18),
         xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[0, 29]),
         yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[6.0, 10.2]),
     )
@@ -88,22 +97,22 @@ def create_gauge_chart(score: float, relative_note: str = "") -> go.Figure:
         value=score,
         domain={'x': [0, 1], 'y': [0, 1]},
         title={
-            'text': f"<span style='font-family:{FONT_SERIF};font-size:19px;color:{PALETTE['cocoa']}'>Predicted Next-Cycle Health Score</span><br><span style='font-family:{FONT_SANS};font-size:11px;color:#735D58;'>{relative_note}</span>",
+            'text': f"<span style='font-family:{FONT_SERIF};font-size:18px;color:{PALETTE['cocoa']}'>Predicted Next-Cycle Health Score</span><br><span style='font-family:{FONT_SANS};font-size:11px;color:#7A6560;'>{relative_note}</span>",
             'font': {'color': PALETTE["cocoa"]}
         },
         number={
             'suffix': " / 10.0",
-            'font': {'size': 34, 'color': PALETTE["cocoa"], 'family': FONT_SERIF}
+            'font': {'size': 32, 'color': PALETTE["cocoa"], 'family': FONT_SERIF}
         },
         gauge={
             'axis': {
                 'range': [0, 10],
                 'tickwidth': 1,
                 'tickcolor': PALETTE["mauve"],
-                'tickfont': {'family': FONT_SANS, 'size': 9, 'color': PALETTE["cocoa"]},
+                'tickfont': {'family': FONT_SANS, 'size': 10, 'color': PALETTE["cocoa"]},
                 'dtick': 2
             },
-            'bar': {'color': bar_color, 'thickness': 0.32},
+            'bar': {'color': bar_color, 'thickness': 0.30},
             'bgcolor': PALETTE["white"],
             'borderwidth': 1,
             'bordercolor': PALETTE["card_border"],
@@ -113,8 +122,8 @@ def create_gauge_chart(score: float, relative_note: str = "") -> go.Figure:
                 {'range': [8.6, 10.0], 'color': "#EFF4EE"},
             ],
             'threshold': {
-                'line': {'color': PALETTE["cocoa"], 'width': 3},
-                'thickness': 0.8,
+                'line': {'color': PALETTE["cocoa"], 'width': 2.5},
+                'thickness': 0.75,
                 'value': 8.60  # Observed cohort median
             }
         }
@@ -123,8 +132,8 @@ def create_gauge_chart(score: float, relative_note: str = "") -> go.Figure:
     fig.update_layout(
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
-        height=230,
-        margin=dict(l=20, r=20, t=40, b=10),
+        height=225,
+        margin=dict(l=20, r=20, t=35, b=10),
     )
     return fig
 
@@ -158,9 +167,10 @@ def create_radar_chart(
         r=curr_values + [curr_values[0]],
         theta=categories + [categories[0]],
         fill='toself',
-        fillcolor='rgba(217, 154, 165, 0.30)',
+        fillcolor='rgba(185, 123, 138, 0.22)',
         line=dict(color=PALETTE["mauve"], width=2.0),
-        name="Current Cycle Observations"
+        name="Current Cycle Observations",
+        hovertemplate="<b>%{theta}</b>: %{r:.1f} / 10<extra></extra>",
     ))
 
     if previous:
@@ -176,9 +186,10 @@ def create_radar_chart(
             r=prev_values + [prev_values[0]],
             theta=categories + [categories[0]],
             fill='toself',
-            fillcolor='rgba(168, 184, 160, 0.20)',
+            fillcolor='rgba(110, 139, 98, 0.15)',
             line=dict(color=PALETTE["sage"], width=1.8, dash='dot'),
-            name="Previous Cycle (Baseline)"
+            name="Previous Cycle (Baseline)",
+            hovertemplate="<b>%{theta} (Baseline)</b>: %{r:.1f} / 10<extra></extra>",
         ))
 
     fig.update_layout(
@@ -186,7 +197,7 @@ def create_radar_chart(
             radialaxis=dict(
                 visible=True,
                 range=[0, 10],
-                tickfont=dict(size=8, color=PALETTE["cocoa"], family=FONT_SANS),
+                tickfont=dict(size=8.5, color=PALETTE["cocoa_light"], family=FONT_SANS),
                 gridcolor=PALETTE["grid_line"],
             ),
             angularaxis=dict(
@@ -200,12 +211,12 @@ def create_radar_chart(
         legend=dict(
             orientation="h",
             yanchor="bottom",
-            y=-0.24,
+            y=-0.22,
             xanchor="center",
             x=0.5,
             font=dict(family=FONT_SANS, size=10, color=PALETTE["cocoa"])
         ),
-        height=300,
+        height=295,
         margin=dict(l=35, r=35, t=15, b=35)
     )
     return fig
@@ -220,9 +231,10 @@ def create_cohort_distribution_chart(scores_series: pd.Series, user_score: Optio
         nbinsx=32,
         marker=dict(
             color=PALETTE["dusty_rose"],
-            line=dict(color=PALETTE["mauve"], width=1)
+            line=dict(color=PALETTE["mauve"], width=0.8)
         ),
-        name="Dataset Cohort (N=15,976)"
+        name="Dataset Cohort (N = 15,976)",
+        hovertemplate="<b>Score Interval:</b> %{x:.2f}<br><b>Observed Cycles:</b> %{y:,}<extra></extra>",
     ))
 
     fig.add_vline(
@@ -243,13 +255,13 @@ def create_cohort_distribution_chart(scores_series: pd.Series, user_score: Optio
             line_color=PALETTE["amber"],
             annotation_text=f"Your Forecast: {user_score:.2f}",
             annotation_position="top right",
-            annotation_font=dict(family=FONT_SANS, size=11, color=PALETTE["amber"])
+            annotation_font=dict(family=FONT_SANS, size=10.5, color=PALETTE["amber"])
         )
 
     fig.update_layout(
         title=dict(
-            text="Distribution of Next-Cycle Health Scores in Dataset",
-            font=dict(family=FONT_SERIF, size=16, color=PALETTE["cocoa"])
+            text="Cohort Health Score Distribution (N = 15,976)",
+            font=dict(family=FONT_SERIF, size=15.5, color=PALETTE["cocoa"])
         ),
         xaxis_title=dict(text="Next-Cycle Health Score (Continuous 0.0 - 10.0 Scale)", font=dict(family=FONT_SANS, size=11, color=PALETTE["cocoa"])),
         yaxis_title=dict(text="Observed Cycle Count", font=dict(family=FONT_SANS, size=11, color=PALETTE["cocoa"])),
@@ -272,9 +284,10 @@ def create_cycle_length_distribution_chart(cycle_lengths: pd.Series) -> go.Figur
         nbinsx=24,
         marker=dict(
             color=PALETTE["peach"],
-            line=dict(color=PALETTE["dusty_rose"], width=1)
+            line=dict(color=PALETTE["dusty_rose"], width=0.8)
         ),
-        name="Observed Cycle Lengths"
+        name="Observed Cycle Lengths",
+        hovertemplate="<b>Cycle Duration:</b> %{x} Days<br><b>Observed Cycles:</b> %{y:,}<extra></extra>",
     ))
 
     fig.add_vline(
@@ -290,9 +303,9 @@ def create_cycle_length_distribution_chart(cycle_lengths: pd.Series) -> go.Figur
     fig.update_layout(
         title=dict(
             text="Observed Cycle Length Distribution (Mean = 27.8 ± 2.4 Days)",
-            font=dict(family=FONT_SERIF, size=16, color=PALETTE["cocoa"])
+            font=dict(family=FONT_SERIF, size=15.5, color=PALETTE["cocoa"])
         ),
-        xaxis_title=dict(text="Cycle Length (Days)", font=dict(family=FONT_SANS, size=11, color=PALETTE["cocoa"])),
+        xaxis_title=dict(text="Cycle Duration (Days)", font=dict(family=FONT_SANS, size=11, color=PALETTE["cocoa"])),
         yaxis_title=dict(text="Frequency (Cycles)", font=dict(family=FONT_SANS, size=11, color=PALETTE["cocoa"])),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor=PALETTE["white"],
@@ -321,7 +334,8 @@ def create_user_trajectory_chart(period_df: pd.DataFrame, user_id: str) -> go.Fi
         mode="lines+markers",
         name="Observed Health Score",
         line=dict(color=PALETTE["mauve"], width=2.2),
-        marker=dict(size=6, color=PALETTE["mauve"])
+        marker=dict(size=6, color=PALETTE["white"], line=dict(color=PALETTE["mauve"], width=2)),
+        hovertemplate="<b>Cycle %{x}</b><br>Observed Score: %{y:.2f} / 10<extra></extra>",
     ))
 
     if "next_health_score" in user_records.columns:
@@ -331,16 +345,17 @@ def create_user_trajectory_chart(period_df: pd.DataFrame, user_id: str) -> go.Fi
             mode="lines+markers",
             name="Next-Cycle Actual Target",
             line=dict(color=PALETTE["sage"], width=1.8, dash="dash"),
-            marker=dict(size=5, color=PALETTE["sage"])
+            marker=dict(size=5, color=PALETTE["sage"]),
+            hovertemplate="<b>Cycle %{x}</b><br>Next Target: %{y:.2f} / 10<extra></extra>",
         ))
 
     fig.update_layout(
         title=dict(
-            text=f"Longitudinal Health Score Trajectory — User {user_id}",
-            font=dict(family=FONT_SERIF, size=16, color=PALETTE["cocoa"])
+            text=f"Longitudinal Cycle History — Record {user_id}",
+            font=dict(family=FONT_SERIF, size=15.5, color=PALETTE["cocoa"])
         ),
         xaxis_title=dict(text="Cycle Sequence Number", font=dict(family=FONT_SANS, size=11, color=PALETTE["cocoa"])),
-        yaxis_title=dict(text="Health Score (0.0 - 10.0)", font=dict(family=FONT_SANS, size=11, color=PALETTE["cocoa"])),
+        yaxis_title=dict(text="Health Score (0.0 - 10.0 Scale)", font=dict(family=FONT_SANS, size=11, color=PALETTE["cocoa"])),
         yaxis=dict(range=[3.5, 10.5], gridcolor=PALETTE["grid_line"], tickfont=dict(family=FONT_SANS, color=PALETTE["cocoa"])),
         xaxis=dict(tickmode='linear', dtick=1, gridcolor=PALETTE["grid_line"], tickfont=dict(family=FONT_SANS, color=PALETTE["cocoa"])),
         paper_bgcolor='rgba(0,0,0,0)',
@@ -377,7 +392,8 @@ def create_model_comparison_bar_chart() -> go.Figure:
         marker=dict(color=PALETTE["mauve"]),
         text=[f"{v:.4f}" for v in mae_vals],
         textposition="outside",
-        textfont=dict(family=FONT_SANS, size=10, color=PALETTE["cocoa"])
+        textfont=dict(family=FONT_SANS, size=9.5, color=PALETTE["cocoa"]),
+        hovertemplate="<b>%{x}</b><br>MAE: %{y:.4f}<extra></extra>",
     ))
 
     fig.add_trace(go.Bar(
@@ -387,13 +403,14 @@ def create_model_comparison_bar_chart() -> go.Figure:
         marker=dict(color=PALETTE["dusty_rose"]),
         text=[f"{v:.4f}" for v in rmse_vals],
         textposition="outside",
-        textfont=dict(family=FONT_SANS, size=10, color=PALETTE["cocoa"])
+        textfont=dict(family=FONT_SANS, size=9.5, color=PALETTE["cocoa"]),
+        hovertemplate="<b>%{x}</b><br>RMSE: %{y:.4f}<extra></extra>",
     ))
 
     fig.update_layout(
         title=dict(
-            text="Error Metrics Comparison (Test Set, N=3,176 / 400 Users) — Lower is Better",
-            font=dict(family=FONT_SERIF, size=16, color=PALETTE["cocoa"])
+            text="Candidate Model Error Metrics (Test Split, N = 3,176 Cycles)",
+            font=dict(family=FONT_SERIF, size=15.5, color=PALETTE["cocoa"])
         ),
         barmode="group",
         yaxis=dict(
@@ -435,15 +452,16 @@ def create_feature_importance_chart(feature_names: List[str], coefficients: List
         x=df["Coefficient"],
         y=display_names,
         orientation='h',
-        marker=dict(color=colors, line=dict(width=0))
+        marker=dict(color=colors, line=dict(width=0)),
+        hovertemplate="<b>%{y}</b><br>Standardized Effect: %{x:+.4f}<extra></extra>",
     ))
 
     fig.update_layout(
         title=dict(
-            text="Top Verified Ridge Model Drivers (Standardized Effect)",
-            font=dict(family=FONT_SERIF, size=16, color=PALETTE["cocoa"])
+            text="Top Verified Ridge Model Drivers (Standardized Effect Sizes)",
+            font=dict(family=FONT_SERIF, size=15.5, color=PALETTE["cocoa"])
         ),
-        xaxis_title=dict(text="Standardized Effect Size (+ Supports Health, - Lowers Score)", font=dict(family=FONT_SANS, size=10.5, color=PALETTE["cocoa"])),
+        xaxis_title=dict(text="Standardized Effect (+ Supports Health Score, − Lowers Score)", font=dict(family=FONT_SANS, size=10.5, color=PALETTE["cocoa"])),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor=PALETTE["white"],
         height=330,
@@ -471,13 +489,14 @@ def create_phase_distribution_chart(cohort_df: pd.DataFrame) -> go.Figure:
         marker=dict(color=colors[:len(phase_counts)]),
         text=[f"{p:.1f}%" for p in phase_counts["Percentage"]],
         textposition="outside",
-        textfont=dict(family=FONT_SANS, size=11, color=PALETTE["cocoa"])
+        textfont=dict(family=FONT_SANS, size=10.5, color=PALETTE["cocoa"]),
+        hovertemplate="<b>%{x} Phase</b><br>Cohort Proportion: %{y:.1f}%<extra></extra>",
     ))
 
     fig.update_layout(
         title=dict(
-            text="Observed Cycle Phases at Log Entry (Dataset N=15,976)",
-            font=dict(family=FONT_SERIF, size=16, color=PALETTE["cocoa"])
+            text="Observed Cycle Phases at Log Entry (Dataset N = 15,976)",
+            font=dict(family=FONT_SERIF, size=15.5, color=PALETTE["cocoa"])
         ),
         xaxis_title=dict(text="Phase Reported During Log", font=dict(family=FONT_SANS, size=11, color=PALETTE["cocoa"])),
         yaxis_title=dict(text="Cohort Proportion (%)", font=dict(family=FONT_SANS, size=11, color=PALETTE["cocoa"])),
@@ -503,16 +522,17 @@ def create_pain_vs_health_chart(cohort_df: pd.DataFrame) -> go.Figure:
     fig.add_trace(go.Bar(
         x=grouped["pain_level"],
         y=grouped["overall_health_score"],
-        marker=dict(color=PALETTE["dusty_rose"], line=dict(color=PALETTE["mauve"], width=1)),
+        marker=dict(color=PALETTE["dusty_rose"], line=dict(color=PALETTE["mauve"], width=0.8)),
         text=[f"{s:.2f}" for s in grouped["overall_health_score"]],
         textposition="inside",
-        textfont=dict(family=FONT_SANS, size=10, color=PALETTE["white"])
+        textfont=dict(family=FONT_SANS, size=10, color=PALETTE["white"]),
+        hovertemplate="<b>Pain Level:</b> %{x}<br><b>Mean Health Score:</b> %{y:.2f} / 10<extra></extra>",
     ))
 
     fig.update_layout(
         title=dict(
-            text="Observed Pain Level vs Mean Health Score (N=15,976)",
-            font=dict(family=FONT_SERIF, size=16, color=PALETTE["cocoa"])
+            text="Observed Pain Level vs. Mean Health Score (N = 15,976)",
+            font=dict(family=FONT_SERIF, size=15.5, color=PALETTE["cocoa"])
         ),
         xaxis_title=dict(text="Reported Pain Level (1 to 10)", font=dict(family=FONT_SANS, size=11, color=PALETTE["cocoa"])),
         yaxis_title=dict(text="Mean Overall Health Score", font=dict(family=FONT_SANS, size=11, color=PALETTE["cocoa"])),

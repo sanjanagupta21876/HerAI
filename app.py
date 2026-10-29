@@ -1,7 +1,7 @@
 """HERAI — Women's Menstrual Health Intelligence Application.
 
 AI-assisted menstrual-health pattern analysis and next-cycle health-score prediction.
-Built with a calm, trustworthy, and elegant healthcare design system.
+Built with a calm, trustworthy, and restrained healthcare design system.
 """
 
 import sys
@@ -42,10 +42,10 @@ from herai.visualizations import (
     PALETTE,
 )
 
-# Page configuration
+# Page configuration - professional and clean, no emoji
 st.set_page_config(
     page_title="HERAI | Menstrual Health Intelligence",
-    page_icon="🌸",
+    page_icon=None,
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -60,7 +60,7 @@ if "last_prediction" not in st.session_state:
 if "last_inputs" not in st.session_state:
     st.session_state.last_inputs = None
 
-# Custom CSS for Phase 3 Visual Design System & Elevated Health-Tech UI
+# Custom CSS for Restrained, Professional Health-Tech Design System
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
@@ -70,15 +70,16 @@ st.markdown("""
         --color-peach: #F8E5DB;
         --color-dusty-rose: #D99AA5;
         --color-mauve: #B97B8A;
-        --color-mauve-dark: #A26876;
+        --color-mauve-dark: #925363;
         --color-cocoa: #59433F;
         --color-cocoa-light: #7A6560;
-        --color-sage: #A8B8A0;
+        --color-sage: #6E8B62;
         --color-lavender: #EAE5F4;
         --color-white: #FFFFFF;
         --color-amber: #C97A3E;
         --color-border: #F0E2DA;
         --color-border-subtle: #F6EDE7;
+        --color-track: #FAF5F2;
         --font-serif: 'DM Serif Display', Georgia, serif;
         --font-sans: 'Inter', 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     }
@@ -103,97 +104,161 @@ st.markdown("""
         font-weight: 400;
         letter-spacing: -0.015em;
     }
-    h1 { font-size: 2.2rem; line-height: 1.25; margin-bottom: 0.4rem; }
-    h2 { font-size: 1.65rem; line-height: 1.3; margin-top: 1.3rem; margin-bottom: 0.6rem; }
-    h3 { font-size: 1.28rem; line-height: 1.35; margin-bottom: 0.5rem; }
+    h1 { font-size: 2.15rem; line-height: 1.25; margin-bottom: 0.35rem; }
+    h2 { font-size: 1.6rem; line-height: 1.3; margin-top: 1.2rem; margin-bottom: 0.5rem; }
+    h3 { font-size: 1.24rem; line-height: 1.35; margin-bottom: 0.45rem; }
     p, span, label, div {
         color: var(--color-cocoa);
         font-family: var(--font-sans);
     }
 
-    /* Segmented Pill Navigation Bar */
+    /* Header Brand Styling */
+    .header-brand {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+    }
+    .brand-wordmark {
+        font-family: var(--font-serif);
+        font-size: 1.85rem;
+        color: var(--color-cocoa);
+        font-weight: 400;
+        letter-spacing: -0.02em;
+    }
+    .brand-divider {
+        display: inline-block;
+        width: 1px;
+        height: 16px;
+        background-color: #ECDAD2;
+        vertical-align: middle;
+    }
+    .brand-tagline {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--color-mauve);
+    }
+
+    /* Segmented Navigation Tab Bar (st.radio) */
     div[data-testid="stRadio"] div[role="radiogroup"] {
         display: flex;
         flex-direction: row;
-        gap: 8px;
+        gap: 4px;
         align-items: center;
-        justify-content: flex-end;
+        background: var(--color-track);
+        padding: 4px;
+        border-radius: 10px;
+        border: 1px solid var(--color-border);
     }
     div[data-testid="stRadio"] div[role="radiogroup"] > label > div:first-child {
         display: none !important;
     }
     div[data-testid="stRadio"] div[role="radiogroup"] > label {
-        background: var(--color-white) !important;
-        border: 1px solid var(--color-border) !important;
-        border-radius: 24px !important;
+        background: transparent !important;
+        border: 1px solid transparent !important;
+        border-radius: 8px !important;
         padding: 7px 16px !important;
         margin: 0 !important;
-        transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        transition: all 0.18s ease-in-out !important;
         cursor: pointer !important;
-        box-shadow: 0 1px 3px rgba(89, 67, 63, 0.03) !important;
+        box-shadow: none !important;
     }
     div[data-testid="stRadio"] div[role="radiogroup"] > label:hover {
-        background: #FAF3EE !important;
-        border-color: var(--color-dusty-rose) !important;
-        transform: translateY(-1px) !important;
-        box-shadow: 0 3px 8px rgba(89, 67, 63, 0.08) !important;
+        background: rgba(185, 123, 138, 0.08) !important;
     }
     div[data-testid="stRadio"] div[role="radiogroup"] > label:has(input:checked) {
-        background: linear-gradient(135deg, #B97B8A 0%, #A26876 100%) !important;
-        border-color: var(--color-mauve) !important;
-        box-shadow: 0 3px 12px rgba(185, 123, 138, 0.35) !important;
+        background: var(--color-white) !important;
+        border-color: var(--color-border) !important;
+        box-shadow: 0 1px 4px rgba(89, 67, 63, 0.06) !important;
     }
     div[data-testid="stRadio"] div[role="radiogroup"] > label:has(input:checked) span,
     div[data-testid="stRadio"] div[role="radiogroup"] > label:has(input:checked) div,
     div[data-testid="stRadio"] div[role="radiogroup"] > label:has(input:checked) p {
-        color: var(--color-white) !important;
+        color: var(--color-cocoa) !important;
         font-weight: 600 !important;
+    }
+    div[data-testid="stRadio"] div[role="radiogroup"] > label:not(:has(input:checked)) span,
+    div[data-testid="stRadio"] div[role="radiogroup"] > label:not(:has(input:checked)) div,
+    div[data-testid="stRadio"] div[role="radiogroup"] > label:not(:has(input:checked)) p {
+        color: var(--color-cocoa-light) !important;
+        font-weight: 500 !important;
+    }
+
+    /* Streamlit Native Tabs Styling */
+    div[data-testid="stTabs"] {
+        margin-top: 14px;
+        margin-bottom: 20px;
+    }
+    div[data-testid="stTabs"] div[role="tablist"] {
+        gap: 8px;
+        border-bottom: 1px solid var(--color-border);
+        padding-bottom: 2px;
+    }
+    div[data-testid="stTabs"] button[role="tab"] {
+        font-family: var(--font-sans);
+        font-size: 0.92rem;
+        font-weight: 500;
+        color: var(--color-cocoa-light);
+        padding: 8px 18px;
+        border: none;
+        border-bottom: 2px solid transparent;
+        background: transparent;
+        transition: all 0.2s ease;
+    }
+    div[data-testid="stTabs"] button[role="tab"]:hover {
+        color: var(--color-cocoa);
+        background: rgba(185, 123, 138, 0.05);
+        border-radius: 6px 6px 0 0;
+    }
+    div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] {
+        color: var(--color-mauve);
+        font-weight: 600;
+        border-bottom: 2px solid var(--color-mauve);
     }
 
     /* Welcome / Hero Section */
     .hero-banner {
         background: linear-gradient(135deg, #FFF9F5 0%, #F8E5DB 55%, #EAE5F4 100%);
         border: 1px solid var(--color-border);
-        border-radius: 16px;
-        padding: 30px 36px;
-        margin-bottom: 22px;
-        box-shadow: 0 4px 16px rgba(89, 67, 63, 0.04);
-        position: relative;
-        overflow: hidden;
+        border-radius: 14px;
+        padding: 26px 32px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 10px rgba(89, 67, 63, 0.02);
     }
     .hero-headline {
         font-family: var(--font-serif);
-        font-size: 2.35rem;
+        font-size: 2.25rem;
         color: var(--color-cocoa);
-        margin-bottom: 10px;
+        margin-bottom: 8px;
         line-height: 1.2;
     }
     .hero-subtext {
-        font-size: 1.05rem;
+        font-size: 1.02rem;
         color: #6E5752;
         line-height: 1.55;
-        max-width: 820px;
-        margin-bottom: 6px;
+        max-width: 800px;
+        margin-bottom: 4px;
     }
 
     /* Card System */
     .card-surface {
         background: var(--color-white);
         border: 1px solid var(--color-border);
-        border-radius: 14px;
-        padding: 22px 24px;
-        margin-bottom: 18px;
-        box-shadow: 0 3px 12px rgba(89, 67, 63, 0.03);
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        border-radius: 12px;
+        padding: 20px 22px;
+        margin-bottom: 16px;
+        box-shadow: 0 2px 6px rgba(89, 67, 63, 0.02);
+        transition: border-color 0.2s ease;
     }
     .card-surface:hover {
-        box-shadow: 0 5px 16px rgba(89, 67, 63, 0.06);
+        border-color: #E2D1C9;
     }
     .card-header-serif {
         font-family: var(--font-serif);
-        font-size: 1.25rem;
+        font-size: 1.22rem;
         color: var(--color-cocoa);
-        margin-bottom: 14px;
+        margin-bottom: 12px;
         padding-bottom: 8px;
         border-bottom: 1px solid var(--color-border-subtle);
         display: flex;
@@ -205,37 +270,31 @@ st.markdown("""
     .metric-stat-box {
         background: var(--color-white);
         border: 1px solid var(--color-border);
-        border-top: 3.5px solid var(--color-mauve);
-        border-radius: 12px;
-        padding: 18px 20px;
+        border-radius: 10px;
+        padding: 16px 18px;
         height: 100%;
-        box-shadow: 0 2px 8px rgba(89, 67, 63, 0.02);
+        box-shadow: 0 1px 4px rgba(89, 67, 63, 0.02);
         display: flex;
         flex-direction: column;
         justify-content: space-between;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-    .metric-stat-box:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 16px rgba(89, 67, 63, 0.06);
     }
     .metric-stat-label {
-        font-size: 0.78rem;
-        font-weight: 600;
+        font-size: 0.74rem;
+        font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.06em;
         color: var(--color-mauve);
         margin-bottom: 4px;
     }
     .metric-stat-value {
         font-family: var(--font-serif);
-        font-size: 1.75rem;
+        font-size: 1.7rem;
         color: var(--color-cocoa);
         line-height: 1.2;
         margin-bottom: 4px;
     }
     .metric-stat-detail {
-        font-size: 0.82rem;
+        font-size: 0.8rem;
         color: var(--color-cocoa-light);
         line-height: 1.4;
     }
@@ -244,28 +303,27 @@ st.markdown("""
     .badge-pill {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        background: rgba(185, 123, 138, 0.12);
-        color: #882D52;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 0.76rem;
-        font-weight: 600;
-        letter-spacing: 0.03em;
+        background: rgba(185, 123, 138, 0.10);
+        color: var(--color-mauve-dark);
+        padding: 3px 10px;
+        border-radius: 6px;
+        font-size: 0.74rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
         text-transform: uppercase;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
     }
     .step-pill {
         display: inline-block;
         background: #F4EAE6;
-        color: #882D52;
+        color: var(--color-mauve-dark);
         font-family: var(--font-sans);
         font-weight: 700;
-        font-size: 0.72rem;
+        font-size: 0.70rem;
         letter-spacing: 0.06em;
         text-transform: uppercase;
         padding: 3px 8px;
-        border-radius: 6px;
+        border-radius: 5px;
         margin-right: 6px;
         vertical-align: middle;
     }
@@ -273,9 +331,9 @@ st.markdown("""
         background: #EFF4EE;
         color: #2D5028;
         border: 1px solid #C8D7C2;
-        border-radius: 20px;
-        padding: 5px 14px;
-        font-size: 0.84rem;
+        border-radius: 6px;
+        padding: 4px 12px;
+        font-size: 0.82rem;
         font-weight: 600;
         display: inline-block;
     }
@@ -283,37 +341,37 @@ st.markdown("""
         background: #FDF4EB;
         color: #8C4E1A;
         border: 1px solid #F0D4BC;
-        border-radius: 20px;
-        padding: 5px 14px;
-        font-size: 0.84rem;
+        border-radius: 6px;
+        padding: 4px 12px;
+        font-size: 0.82rem;
         font-weight: 600;
         display: inline-block;
     }
 
     /* Primary and Secondary CTA Buttons */
     button[kind="primary"], [data-testid="stBaseButton-primary"] {
-        background: linear-gradient(135deg, #B97B8A 0%, #A26876 100%) !important;
+        background: var(--color-mauve) !important;
         color: var(--color-white) !important;
         font-family: var(--font-sans) !important;
         font-weight: 600 !important;
-        font-size: 0.96rem !important;
+        font-size: 0.94rem !important;
         border: none !important;
-        border-radius: 10px !important;
-        padding: 10px 24px !important;
-        min-height: 44px !important;
-        box-shadow: 0 3px 12px rgba(185, 123, 138, 0.32) !important;
-        transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        border-radius: 8px !important;
+        padding: 9px 22px !important;
+        min-height: 42px !important;
+        box-shadow: 0 2px 8px rgba(185, 123, 138, 0.25) !important;
+        transition: all 0.2s ease !important;
         cursor: pointer !important;
     }
     button[kind="primary"]:hover, [data-testid="stBaseButton-primary"]:hover {
-        background: linear-gradient(135deg, #A86B79 0%, #905764 100%) !important;
+        background: var(--color-mauve-dark) !important;
         color: var(--color-white) !important;
-        box-shadow: 0 6px 18px rgba(185, 123, 138, 0.45) !important;
-        transform: translateY(-1.5px) !important;
+        box-shadow: 0 4px 12px rgba(185, 123, 138, 0.35) !important;
+        transform: translateY(-1px) !important;
     }
     button[kind="primary"]:active, [data-testid="stBaseButton-primary"]:active {
         transform: translateY(0) !important;
-        box-shadow: 0 2px 6px rgba(185, 123, 138, 0.2) !important;
+        box-shadow: 0 1px 4px rgba(185, 123, 138, 0.2) !important;
     }
 
     button[kind="secondary"], [data-testid="stBaseButton-secondary"] {
@@ -321,40 +379,38 @@ st.markdown("""
         color: var(--color-cocoa) !important;
         font-family: var(--font-sans) !important;
         font-weight: 500 !important;
-        font-size: 0.96rem !important;
+        font-size: 0.94rem !important;
         border: 1.5px solid #E2D1C9 !important;
-        border-radius: 10px !important;
-        padding: 10px 22px !important;
-        min-height: 44px !important;
-        box-shadow: 0 1px 4px rgba(89, 67, 63, 0.04) !important;
-        transition: all 0.22s ease !important;
+        border-radius: 8px !important;
+        padding: 9px 20px !important;
+        min-height: 42px !important;
+        box-shadow: 0 1px 3px rgba(89, 67, 63, 0.03) !important;
+        transition: all 0.2s ease !important;
         cursor: pointer !important;
     }
     button[kind="secondary"]:hover, [data-testid="stBaseButton-secondary"]:hover {
         background: #FAF3EE !important;
         border-color: var(--color-mauve) !important;
-        color: #882D52 !important;
-        box-shadow: 0 4px 12px rgba(89, 67, 63, 0.08) !important;
+        color: var(--color-mauve-dark) !important;
         transform: translateY(-1px) !important;
     }
     button[kind="secondary"]:active, [data-testid="stBaseButton-secondary"]:active {
         transform: translateY(0) !important;
-        box-shadow: 0 1px 2px rgba(89, 67, 63, 0.04) !important;
     }
 
-    /* Fallback default stButton button */
+    /* Fallback default button */
     .stButton>button {
-        border-radius: 10px;
-        min-height: 44px;
+        border-radius: 8px;
+        min-height: 42px;
         font-weight: 600;
-        font-size: 0.96rem;
+        font-size: 0.94rem;
         transition: all 0.2s ease;
     }
 
     /* Accessible focus states for radio and inputs */
     .stRadio div[role="radiogroup"] label:focus-within {
         outline: 2px solid var(--color-mauve) !important;
-        border-radius: 24px !important;
+        border-radius: 8px !important;
     }
     input:focus-visible, select:focus-visible, textarea:focus-visible {
         border-color: var(--color-mauve) !important;
@@ -365,9 +421,9 @@ st.markdown("""
     .callout-lavender {
         background: var(--color-lavender);
         border-left: 3.5px solid var(--color-mauve);
-        padding: 14px 18px;
-        border-radius: 0 10px 10px 0;
-        font-size: 0.88rem;
+        padding: 13px 16px;
+        border-radius: 0 8px 8px 0;
+        font-size: 0.86rem;
         color: var(--color-cocoa);
         margin: 12px 0;
         line-height: 1.5;
@@ -375,19 +431,19 @@ st.markdown("""
     .disclaimer-card {
         background: #FAF5F2;
         border: 1px solid #EFE4DC;
-        border-radius: 12px;
-        padding: 18px 22px;
-        font-size: 0.84rem;
+        border-radius: 10px;
+        padding: 16px 20px;
+        font-size: 0.82rem;
         line-height: 1.55;
         color: var(--color-cocoa-light);
-        margin-top: 32px;
+        margin-top: 30px;
     }
 
     /* Prediction Result Banner */
     .score-result-banner {
-        border-radius: 14px;
-        padding: 24px 30px;
-        margin: 18px 0 22px 0;
+        border-radius: 12px;
+        padding: 22px 26px;
+        margin: 16px 0 20px 0;
         border: 1px solid;
     }
     .score-banner-optimal {
@@ -402,23 +458,23 @@ st.markdown("""
     }
     .score-result-title {
         font-family: var(--font-serif);
-        font-size: 1.75rem;
-        margin-bottom: 6px;
+        font-size: 1.7rem;
+        margin-bottom: 4px;
     }
     .score-result-subtitle {
-        font-size: 0.98rem;
-        line-height: 1.55;
+        font-size: 0.95rem;
+        line-height: 1.5;
     }
 
     /* Empty state card */
     .empty-state-card {
         background: var(--color-white);
         border: 1.5px dashed var(--color-border);
-        border-radius: 14px;
-        padding: 36px 26px;
+        border-radius: 12px;
+        padding: 34px 24px;
         text-align: center;
         color: var(--color-cocoa-light);
-        margin: 18px 0;
+        margin: 16px 0;
         transition: border-color 0.2s ease;
     }
     .empty-state-card:hover {
@@ -434,53 +490,53 @@ st.markdown("""
             padding-right: 0.8rem !important;
         }
         .hero-banner {
-            padding: 20px 18px !important;
-            border-radius: 12px !important;
+            padding: 18px 16px !important;
+            border-radius: 10px !important;
         }
         .hero-headline {
-            font-size: 1.6rem !important;
+            font-size: 1.55rem !important;
         }
         .hero-subtext {
-            font-size: 0.92rem !important;
+            font-size: 0.90rem !important;
             margin-bottom: 12px !important;
         }
-        h1 { font-size: 1.65rem !important; }
-        h2 { font-size: 1.35rem !important; }
-        h3 { font-size: 1.12rem !important; }
+        h1 { font-size: 1.6rem !important; }
+        h2 { font-size: 1.3rem !important; }
+        h3 { font-size: 1.1rem !important; }
         .metric-stat-box {
-            padding: 14px 16px !important;
+            padding: 12px 14px !important;
             margin-bottom: 8px !important;
         }
         .metric-stat-value {
-            font-size: 1.45rem !important;
+            font-size: 1.4rem !important;
         }
         .card-surface {
-            padding: 16px 18px !important;
-            border-radius: 12px !important;
+            padding: 14px 16px !important;
+            border-radius: 10px !important;
         }
         .score-result-banner {
-            padding: 18px 20px !important;
+            padding: 16px 18px !important;
         }
         .score-result-title {
-            font-size: 1.4rem !important;
+            font-size: 1.35rem !important;
         }
         div[data-testid="stRadio"] div[role="radiogroup"] {
             flex-wrap: wrap !important;
             justify-content: flex-start !important;
-            gap: 6px !important;
+            gap: 4px !important;
         }
     }
 
     @media (max-width: 480px) {
         .hero-headline {
-            font-size: 1.35rem !important;
+            font-size: 1.30rem !important;
         }
         .metric-stat-value {
-            font-size: 1.25rem !important;
+            font-size: 1.20rem !important;
         }
         .stButton>button {
             width: 100% !important;
-            min-height: 46px !important;
+            min-height: 44px !important;
         }
     }
 </style>
@@ -505,37 +561,24 @@ def get_cohort_dataset() -> pd.DataFrame:
 
 def render_app_header():
     """Render the top clean application header with HERAI wordmark and navigation."""
-    nav_col1, nav_col2 = st.columns([1, 2.5], vertical_alignment="center")
+    nav_col1, nav_col2 = st.columns([1, 2.3], vertical_alignment="center")
 
     with nav_col1:
         st.markdown("""
-        <div style="display: flex; align-items: center; gap: 10px; padding: 4px 0;">
-            <div style="width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, #F8E5DB, #EAE5F4); display: flex; align-items: center; justify-content: center; font-size: 1.3rem; box-shadow: 0 2px 6px rgba(89, 67, 63, 0.06);">🌸</div>
-            <div>
-                <div style="display: flex; align-items: baseline; gap: 6px;">
-                    <span style="font-family: 'DM Serif Display', Georgia, serif; font-size: 1.85rem; color: #59433F; font-weight: 400; letter-spacing: -0.02em;">HERAI</span>
-                    <span style="font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #B97B8A;">Health Intelligence</span>
-                </div>
-                <div style="font-size: 0.72rem; color: #8F7B76; letter-spacing: 0.02em;">AI-Assisted Menstrual Pattern Analysis</div>
-            </div>
+        <div class="header-brand">
+            <span class="brand-wordmark">HERAI</span>
+            <span class="brand-divider"></span>
+            <span class="brand-tagline">Health Intelligence</span>
         </div>
         """, unsafe_allow_html=True)
 
     with nav_col2:
         pages = ["Dashboard", "Health Prediction", "Cycle Information", "Model Insights", "About"]
         current_idx = pages.index(st.session_state.current_page) if st.session_state.current_page in pages else 0
-        nav_labels = {
-            "Dashboard": "✦ Dashboard",
-            "Health Prediction": "🔮 Prediction",
-            "Cycle Information": "🌿 Cycle Biology",
-            "Model Insights": "📊 Model Insights",
-            "About": "ℹ️ About"
-        }
         selected = st.radio(
             "Navigation",
             pages,
             index=current_idx,
-            format_func=lambda p: nav_labels.get(p, p),
             horizontal=True,
             label_visibility="collapsed",
             key="header_nav_radio"
@@ -544,7 +587,7 @@ def render_app_header():
             st.session_state.current_page = selected
             st.rerun()
 
-    st.markdown("<hr style='margin: 8px 0 22px 0; border: none; border-top: 1px solid #F0E2DA;'>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin: 8px 0 20px 0; border: none; border-top: 1px solid #F0E2DA;'>", unsafe_allow_html=True)
 
 
 # =============================================================================
@@ -555,7 +598,7 @@ def render_dashboard(cohort_df: pd.DataFrame):
     # B. Landing page / Introduction section
     st.markdown("""
     <div class="hero-banner">
-        <div class="badge-pill">✨ Machine Learning Menstrual Intelligence</div>
+        <div class="badge-pill">Clinical ML Prototype &bull; Non-Diagnostic</div>
         <div class="hero-headline">Understand Your Cycle. Discover Your Patterns.</div>
         <div class="hero-subtext">
             Explore menstrual-health patterns through data-driven insights and an experimental next-cycle health-score prediction model.
@@ -581,7 +624,7 @@ def render_dashboard(cohort_df: pd.DataFrame):
         fig_wave = create_cycle_wave_hero()
         st.plotly_chart(fig_wave, use_container_width=True, config={"displayModeBar": False})
 
-    st.markdown("<hr style='margin: 22px 0; border: none; border-top: 1px solid #F0E2DA;'>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin: 20px 0; border: none; border-top: 1px solid #F0E2DA;'>", unsafe_allow_html=True)
 
     # C. Overview Cards
     st.markdown("### System & Cohort Overview")
@@ -594,12 +637,9 @@ def render_dashboard(cohort_df: pd.DataFrame):
 
     with c1:
         st.markdown(f"""
-        <div class="metric-stat-box" style="border-top: 3.5px solid var(--color-mauve);">
+        <div class="metric-stat-box" style="border-top: 3px solid var(--color-mauve);">
             <div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span class="metric-stat-label">Evaluated Cycles</span>
-                    <span style="font-size: 1rem; opacity: 0.65;">📈</span>
-                </div>
+                <div class="metric-stat-label">Evaluated Cycles</div>
                 <div class="metric-stat-value">{total_records:,}</div>
             </div>
             <div class="metric-stat-detail">Across {unique_users:,} user profiles in training cohort</div>
@@ -608,12 +648,9 @@ def render_dashboard(cohort_df: pd.DataFrame):
 
     with c2:
         st.markdown(f"""
-        <div class="metric-stat-box" style="border-top: 3.5px solid var(--color-sage);">
+        <div class="metric-stat-box" style="border-top: 3px solid var(--color-sage);">
             <div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span class="metric-stat-label" style="color: #4D6B45;">Observed Cycle Length</span>
-                    <span style="font-size: 1rem; opacity: 0.65;">📅</span>
-                </div>
+                <div class="metric-stat-label" style="color: #4D6B45;">Observed Cycle Length</div>
                 <div class="metric-stat-value">{avg_cycle_len}</div>
             </div>
             <div class="metric-stat-detail">Median: 28.0 days (Std Dev: ±2.4 days)</div>
@@ -622,13 +659,10 @@ def render_dashboard(cohort_df: pd.DataFrame):
 
     with c3:
         st.markdown("""
-        <div class="metric-stat-box" style="border-top: 3.5px solid var(--color-dusty-rose);">
+        <div class="metric-stat-box" style="border-top: 3px solid var(--color-dusty-rose);">
             <div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span class="metric-stat-label" style="color: #9E5664;">Production Model</span>
-                    <span style="font-size: 1rem; opacity: 0.65;">🧠</span>
-                </div>
-                <div class="metric-stat-value" style="font-size: 1.38rem; padding-top: 3px;">Ridge (37 Feat.)</div>
+                <div class="metric-stat-label" style="color: #9E5664;">Production Model</div>
+                <div class="metric-stat-value" style="font-size: 1.35rem; padding-top: 3px;">Ridge (37 Feat.)</div>
             </div>
             <div class="metric-stat-detail">R² = 0.4620 | MAE = 0.6448 on test users</div>
         </div>
@@ -638,12 +672,9 @@ def render_dashboard(cohort_df: pd.DataFrame):
         last_pred = st.session_state.last_prediction
         if last_pred is not None:
             st.markdown(f"""
-            <div class="metric-stat-box" style="border-top: 3.5px solid var(--color-amber); background: #FFFAF5;">
+            <div class="metric-stat-box" style="border-top: 3px solid var(--color-amber); background: #FFFAF5;">
                 <div>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span class="metric-stat-label" style="color: #A35216;">Your Latest Forecast</span>
-                        <span style="font-size: 1rem; opacity: 0.7;">✨</span>
-                    </div>
+                    <div class="metric-stat-label" style="color: #A35216;">Your Latest Forecast</div>
                     <div class="metric-stat-value">{last_pred.predicted_next_health_score:.2f} <span style="font-size: 0.95rem; color: #7A6560;">/ 10</span></div>
                 </div>
                 <div class="metric-stat-detail">{last_pred.score_category} Health Tier</div>
@@ -651,59 +682,62 @@ def render_dashboard(cohort_df: pd.DataFrame):
             """, unsafe_allow_html=True)
         else:
             st.markdown("""
-            <div class="metric-stat-box" style="border-top: 3.5px solid #D6C7C0; background: #FAF7F5;">
+            <div class="metric-stat-box" style="border-top: 3px solid #D6C7C0; background: #FAF7F5;">
                 <div>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span class="metric-stat-label" style="color: #8C7B76;">Your Latest Forecast</span>
-                        <span style="font-size: 1rem; opacity: 0.5;">✨</span>
-                    </div>
-                    <div class="metric-stat-value" style="font-size: 1.25rem; color: #8F7B76; padding-top: 4px;">No Forecast Yet</div>
+                    <div class="metric-stat-label" style="color: #8C7B76;">Your Latest Forecast</div>
+                    <div class="metric-stat-value" style="font-size: 1.22rem; color: #8F7B76; padding-top: 4px;">No Forecast Yet</div>
                 </div>
                 <div class="metric-stat-detail">Run prediction to see your score</div>
             </div>
             """, unsafe_allow_html=True)
 
-    st.markdown("<div style='margin-top: 16px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-top: 18px;'></div>", unsafe_allow_html=True)
 
-    # Health Pattern Visualizations
-    st.markdown("### Observational Health Patterns")
-    st.caption("Visualizing empirical trends across the validated dataset. Correlation does not imply causation.")
+    # Health Pattern Visualizations organized with clean tabs
+    st.markdown("### Cohort Analytics & Longitudinal Trajectories")
+    st.caption("Empirical distributions and multi-cycle tracking across 15,976 validated records. Correlation does not imply causation.")
 
-    chart_c1, chart_c2 = st.columns([1, 1], gap="medium")
+    dash_tab1, dash_tab2 = st.tabs([
+        "Cohort Health Distributions",
+        "Longitudinal Patient Trajectory"
+    ])
 
-    with chart_c1:
-        st.markdown('<div class="card-surface"><div class="card-header-serif">Observed Cycle Length Distribution</div>', unsafe_allow_html=True)
-        if not cohort_df.empty and "cycle_length_days" in cohort_df.columns:
-            fig_len = create_cycle_length_distribution_chart(cohort_df["cycle_length_days"])
-            st.plotly_chart(fig_len, use_container_width=True, config={"displayModeBar": False})
-            st.caption("Observed cycle length across 15,976 records follows an empirical normal distribution around 28 days.")
-        else:
-            st.info("Loading cycle distribution...")
+    with dash_tab1:
+        chart_c1, chart_c2 = st.columns([1, 1], gap="medium")
+
+        with chart_c1:
+            st.markdown('<div class="card-surface"><div class="card-header-serif">Observed Cycle Length Distribution</div>', unsafe_allow_html=True)
+            if not cohort_df.empty and "cycle_length_days" in cohort_df.columns:
+                fig_len = create_cycle_length_distribution_chart(cohort_df["cycle_length_days"])
+                st.plotly_chart(fig_len, use_container_width=True, config={"displayModeBar": False})
+                st.caption("Observed cycle length across 15,976 records follows an empirical normal distribution centered at 28 days.")
+            else:
+                st.info("Loading cycle distribution...")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        with chart_c2:
+            st.markdown('<div class="card-surface"><div class="card-header-serif">Cohort Health Score Distribution</div>', unsafe_allow_html=True)
+            if not cohort_df.empty and "next_health_score" in cohort_df.columns:
+                user_val = st.session_state.last_prediction.predicted_next_health_score if st.session_state.last_prediction else None
+                fig_dist = create_cohort_distribution_chart(cohort_df["next_health_score"].dropna(), user_val)
+                st.plotly_chart(fig_dist, use_container_width=True, config={"displayModeBar": False})
+                st.caption("Distribution parameters across 15,976 cycles: Mean = 8.55, Median = 8.60, Std = 1.11, Range = [4.40, 10.00].")
+            else:
+                st.info("Loading health score distribution...")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    with dash_tab2:
+        st.markdown('<div class="card-surface"><div class="card-header-serif">Longitudinal Cycle Trajectory in Real Records</div>', unsafe_allow_html=True)
+        if not cohort_df.empty and "user_id" in cohort_df.columns:
+            p_col1, p_col2 = st.columns([1, 3], vertical_alignment="center")
+            with p_col1:
+                sample_ids = ["U00001", "U00002", "U00003", "U00004", "U00005"]
+                selected_id = st.selectbox("Select Patient Record:", sample_ids, index=0)
+                st.caption("Inspect logged cycle scores and corresponding next-cycle actual values across consecutive cycles.")
+            with p_col2:
+                fig_traj = create_user_trajectory_chart(cohort_df, selected_id)
+                st.plotly_chart(fig_traj, use_container_width=True, config={"displayModeBar": False})
         st.markdown('</div>', unsafe_allow_html=True)
-
-    with chart_c2:
-        st.markdown('<div class="card-surface"><div class="card-header-serif">Cohort Health Score Distribution</div>', unsafe_allow_html=True)
-        if not cohort_df.empty and "next_health_score" in cohort_df.columns:
-            user_val = st.session_state.last_prediction.predicted_next_health_score if st.session_state.last_prediction else None
-            fig_dist = create_cohort_distribution_chart(cohort_df["next_health_score"].dropna(), user_val)
-            st.plotly_chart(fig_dist, use_container_width=True, config={"displayModeBar": False})
-            st.caption("Distribution parameters across 15,976 cycles: Mean = 8.55, Median = 8.60, Std = 1.11, Range = [4.40, 10.00].")
-        else:
-            st.info("Loading health score distribution...")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    # Longitudinal Multi-Cycle Trajectory Explorer
-    st.markdown('<div class="card-surface"><div class="card-header-serif">Longitudinal Cycle Trajectory in Real Records</div>', unsafe_allow_html=True)
-    if not cohort_df.empty and "user_id" in cohort_df.columns:
-        p_col1, p_col2 = st.columns([1, 3], vertical_alignment="center")
-        with p_col1:
-            sample_ids = ["U00001", "U00002", "U00003", "U00004", "U00005"]
-            selected_id = st.selectbox("Select Patient Record:", sample_ids, index=0)
-            st.caption("Inspect logged cycle scores and corresponding next-cycle actual values across consecutive cycles.")
-        with p_col2:
-            fig_traj = create_user_trajectory_chart(cohort_df, selected_id)
-            st.plotly_chart(fig_traj, use_container_width=True, config={"displayModeBar": False})
-    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # =============================================================================
@@ -711,18 +745,18 @@ def render_dashboard(cohort_df: pd.DataFrame):
 # =============================================================================
 def render_health_prediction(predictor: HerAIPredictor):
     """Render the Health Prediction Page with Structured 3-Section Inputs and Results."""
-    st.markdown('<div class="badge-pill">🔮 Next-Cycle Health Score Predictor</div>', unsafe_allow_html=True)
+    st.markdown('<div class="badge-pill">Predictive Modeling</div>', unsafe_allow_html=True)
     st.markdown("<h1>Health Score Prediction & Consultation</h1>", unsafe_allow_html=True)
     st.markdown(
         "Enter your observational menstrual-cycle data, lifestyle factors, and prior cycle records. "
         "HERAI applies the validated 37-feature Ridge Regression pipeline to estimate your overall health score for your next cycle."
     )
 
-    # Preset selector for fast scenario testing inside an elevated card
+    # Preset selector for fast scenario testing inside a card
     st.markdown("""
     <div class="card-surface" style="margin-bottom: 20px; padding: 18px 22px;">
-        <div style="font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-mauve); margin-bottom: 6px;">
-            ⚡ Quick-Load Observational Scenarios (Demo Presets)
+        <div style="font-size: 0.80rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-mauve); margin-bottom: 6px;">
+            Preload Observational Scenario (Demo Presets)
         </div>
     """, unsafe_allow_html=True)
     pr_col1, pr_col2 = st.columns([1.8, 2.2], vertical_alignment="center")
@@ -731,10 +765,10 @@ def render_health_prediction(predictor: HerAIPredictor):
             "Select Scenario Preset:",
             [
                 "Custom Inputs",
-                "🌸 Balanced & Regular Cycle (Optimal Range)",
-                "⚡ High Stress & Moderate Fatigue",
-                "🩸 Elevated Cramping & Dysmenorrhea",
-                "🌿 Longer Cycle with Mild Symptoms"
+                "Balanced & Regular Cycle (Optimal Range)",
+                "High Stress & Moderate Fatigue",
+                "Elevated Cramping & Dysmenorrhea",
+                "Longer Cycle with Mild Symptoms"
             ],
             index=0,
             label_visibility="collapsed",
@@ -750,28 +784,28 @@ def render_health_prediction(predictor: HerAIPredictor):
     st.markdown("</div>", unsafe_allow_html=True)
 
     # Default mapping
-    if preset == "🌸 Balanced & Regular Cycle (Optimal Range)":
+    if preset == "Balanced & Regular Cycle (Optimal Range)":
         def_age, def_bmi, def_diet, def_exercise = 28, 22.2, "Good", "3–4 days/week"
         def_bsleep, def_bstress = 8.0, 3.0
         def_clen, def_phase, def_flow, def_pain = 28, "Menstrual", "Medium", 2
         def_mood, def_stress, def_sleep = 8, 3.0, 8.0
         def_energy, def_focus, def_lost = 8, 8, 0.0
         def_bc, def_pcos = 0, 0
-    elif preset == "⚡ High Stress & Moderate Fatigue":
+    elif preset == "High Stress & Moderate Fatigue":
         def_age, def_bmi, def_diet, def_exercise = 31, 24.0, "Fair", "1–2 days/week"
         def_bsleep, def_bstress = 6.5, 7.5
         def_clen, def_phase, def_flow, def_pain = 31, "Luteal", "Medium", 4
         def_mood, def_stress, def_sleep = 5, 8.0, 5.5
         def_energy, def_focus, def_lost = 4, 5, 4.0
         def_bc, def_pcos = 0, 0
-    elif preset == "🩸 Elevated Cramping & Dysmenorrhea":
+    elif preset == "Elevated Cramping & Dysmenorrhea":
         def_age, def_bmi, def_diet, def_exercise = 26, 21.5, "Good", "1–2 days/week"
         def_bsleep, def_bstress = 7.0, 5.0
         def_clen, def_phase, def_flow, def_pain = 27, "Menstrual", "Heavy", 7
         def_mood, def_stress, def_sleep = 4, 6.0, 6.0
         def_energy, def_focus, def_lost = 4, 4, 6.0
         def_bc, def_pcos = 0, 0
-    elif preset == "🌿 Longer Cycle with Mild Symptoms":
+    elif preset == "Longer Cycle with Mild Symptoms":
         def_age, def_bmi, def_diet, def_exercise = 29, 26.5, "Fair", "3–4 days/week"
         def_bsleep, def_bstress = 7.5, 5.5
         def_clen, def_phase, def_flow, def_pain = 36, "Follicular", "Light", 3
@@ -895,9 +929,9 @@ def render_health_prediction(predictor: HerAIPredictor):
     st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
     btn_col1, btn_col2 = st.columns([3, 1], vertical_alignment="center")
     with btn_col1:
-        btn_predict = st.button("✨ Generate Health Score Prediction", use_container_width=True, key="btn_run_prediction", type="primary")
+        btn_predict = st.button("Generate Health Score Prediction", use_container_width=True, key="btn_run_prediction", type="primary")
     with btn_col2:
-        btn_reset = st.button("↺ Reset Form", use_container_width=True, key="btn_reset_prediction_form", type="secondary")
+        btn_reset = st.button("Reset Form", use_container_width=True, key="btn_reset_prediction_form", type="secondary")
         if btn_reset:
             st.session_state.last_prediction = None
             st.session_state.last_inputs = None
@@ -957,16 +991,15 @@ def render_health_prediction(predictor: HerAIPredictor):
     if st.session_state.last_prediction is not None:
         render_prediction_results(st.session_state.last_prediction, st.session_state.last_inputs)
     else:
-        st.markdown("<hr style='margin: 30px 0 20px 0; border: none; border-top: 1px solid #F0E2DA;'>", unsafe_allow_html=True)
+        st.markdown("<hr style='margin: 28px 0 18px 0; border: none; border-top: 1px solid #F0E2DA;'>", unsafe_allow_html=True)
         st.markdown("""
         <div class="empty-state-card">
-            <div style="font-size: 2.2rem; margin-bottom: 8px;">🌸</div>
-            <div style="font-family: var(--font-serif); font-size: 1.35rem; color: #59433F; margin-bottom: 6px;">
-                Ready to Generate Your Forecast
+            <div style="font-family: var(--font-serif); font-size: 1.30rem; color: #59433F; margin-bottom: 6px;">
+                Ready for Consultation
             </div>
-            <div style="font-size: 0.90rem; max-width: 540px; margin: 0 auto; line-height: 1.55; color: #7A6560;">
+            <div style="font-size: 0.88rem; max-width: 520px; margin: 0 auto; line-height: 1.55; color: #7A6560;">
                 Review the cycle observations, lifestyle parameters, and history settings above, 
-                then click <b>Generate Health Score Prediction</b> to view your next-cycle score and multidimensional wellbeing radar.
+                then click <b>Generate Health Score Prediction</b> to view your next-cycle score and dimensional wellbeing balance.
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -977,8 +1010,8 @@ def render_health_prediction(predictor: HerAIPredictor):
 # =============================================================================
 def render_prediction_results(result, inputs: Optional[Dict[str, Any]]):
     """Render Section E: Prediction Results Page with scale, context, limitations, and general wellness suggestions."""
-    st.markdown("<hr style='margin: 30px 0 20px 0; border: none; border-top: 1px solid #F0E2DA;'>", unsafe_allow_html=True)
-    st.markdown('<div class="badge-pill">📊 Diagnostic ML Forecast Report</div>', unsafe_allow_html=True)
+    st.markdown("<hr style='margin: 28px 0 18px 0; border: none; border-top: 1px solid #F0E2DA;'>", unsafe_allow_html=True)
+    st.markdown('<div class="badge-pill">Forecast Summary</div>', unsafe_allow_html=True)
     st.markdown("<h2>Prediction Results & Explanation</h2>", unsafe_allow_html=True)
 
     score_val = result.predicted_next_health_score
@@ -987,19 +1020,19 @@ def render_prediction_results(result, inputs: Optional[Dict[str, Any]]):
     if diff_from_median >= 0:
         rel_text = f"+{diff_from_median:.2f} relative to cohort median (8.60)"
         banner_class = "score-banner-optimal"
-        tier_badge_html = '<span class="tier-badge-optimal">✨ Optimal Balance Tier</span>'
+        tier_badge_html = '<span class="tier-badge-optimal">Optimal Balance Tier</span>'
     else:
         rel_text = f"{diff_from_median:.2f} relative to cohort median (8.60)"
         banner_class = "score-banner-moderate"
-        tier_badge_html = '<span class="tier-badge-moderate">⚡ Moderate Variation Tier</span>'
+        tier_badge_html = '<span class="tier-badge-moderate">Moderate Variation Tier</span>'
 
     st.markdown(f"""
     <div class="score-result-banner {banner_class}">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; margin-bottom: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; margin-bottom: 6px;">
             <div>
-                <span style="font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.85;">Ridge Model Forecast (37 Features)</span>
+                <span style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.85;">Ridge Model Forecast (37 Features)</span>
                 <div class="score-result-title">
-                    Predicted Next-Cycle Health Score: <b>{score_val:.2f}</b> <span style="font-size: 1.15rem; font-family: var(--font-sans); font-weight: 400; opacity: 0.8;">/ 10.0</span>
+                    Predicted Next-Cycle Health Score: <b>{score_val:.2f}</b> <span style="font-size: 1.10rem; font-family: var(--font-sans); font-weight: 400; opacity: 0.8;">/ 10.0</span>
                 </div>
             </div>
             <div>
@@ -1021,16 +1054,16 @@ def render_prediction_results(result, inputs: Optional[Dict[str, Any]]):
         st.plotly_chart(gauge_fig, use_container_width=True, config={"displayModeBar": False})
 
         st.markdown(f"""
-        <div style="font-size: 0.88rem; color: #59433F; line-height: 1.5; padding: 6px 4px;">
+        <div style="font-size: 0.86rem; color: #59433F; line-height: 1.5; padding: 4px 2px;">
             <b>Score Interpretation:</b><br>
             The overall health score is a continuous composite indicator modeled from symptom severity, 
-            emotional balance, sleep hours, and stress continuity. In the training dataset (N=15,976), 
+            emotional balance, sleep hours, and stress continuity. In the training dataset (N = 15,976), 
             the middle 50% of records fall between 7.80 and 9.50.
         </div>
         """, unsafe_allow_html=True)
         if result.warnings:
             for w in result.warnings:
-                st.caption(f"ℹ️ {w}")
+                st.caption(f"Note: {w}")
         st.markdown('</div>', unsafe_allow_html=True)
 
     with res_c2:
@@ -1054,7 +1087,7 @@ def render_prediction_results(result, inputs: Optional[Dict[str, Any]]):
         in_c1, in_c2, in_c3 = st.columns(3)
         with in_c1:
             st.markdown(f"""
-            <div style="font-size: 0.88rem; line-height: 1.7; color: var(--color-cocoa);">
+            <div style="font-size: 0.86rem; line-height: 1.7; color: var(--color-cocoa);">
                 <b>Age:</b> {inputs['age']} years<br>
                 <b>BMI:</b> {inputs['bmi']:.1f}<br>
                 <b>Baseline Stress:</b> {inputs['base_stress']:.1f} / 10
@@ -1062,7 +1095,7 @@ def render_prediction_results(result, inputs: Optional[Dict[str, Any]]):
             """, unsafe_allow_html=True)
         with in_c2:
             st.markdown(f"""
-            <div style="font-size: 0.88rem; line-height: 1.7; color: var(--color-cocoa);">
+            <div style="font-size: 0.86rem; line-height: 1.7; color: var(--color-cocoa);">
                 <b>Cycle Length:</b> {inputs['cycle_length']} days<br>
                 <b>Cycle Phase:</b> {inputs['phase']}<br>
                 <b>Flow Heaviness:</b> {inputs['flow']}
@@ -1070,7 +1103,7 @@ def render_prediction_results(result, inputs: Optional[Dict[str, Any]]):
             """, unsafe_allow_html=True)
         with in_c3:
             st.markdown(f"""
-            <div style="font-size: 0.88rem; line-height: 1.7; color: var(--color-cocoa);">
+            <div style="font-size: 0.86rem; line-height: 1.7; color: var(--color-cocoa);">
                 <b>Pain Intensity:</b> {inputs['pain']} / 10<br>
                 <b>Cycle Sleep:</b> {inputs['cycle_sleep']:.1f} hrs<br>
                 <b>Historical Records:</b> {'User Prior Cycle' if inputs['has_history'] else 'Cycle 1 Cohort Baseline'}
@@ -1086,30 +1119,27 @@ def render_prediction_results(result, inputs: Optional[Dict[str, Any]]):
     s1, s2, s3 = st.columns(3)
     with s1:
         st.markdown("""
-        <div style="background: #FDF6EE; border: 1px solid #F0D4BC; border-top: 3px solid var(--color-amber); border-radius: 10px; padding: 16px; font-size: 0.88rem; height: 100%;">
-            <div style="font-size: 1.15rem; margin-bottom: 4px;">🌙</div>
+        <div style="background: #FDF6EE; border: 1px solid #F0D4BC; border-top: 3px solid var(--color-amber); border-radius: 8px; padding: 14px; font-size: 0.86rem; height: 100%;">
             <b style="color: #59433F;">Rest & Recovery Rhythm</b>
-            <p style="font-size: 0.84rem; color: #6E5752; line-height: 1.5; margin-top: 6px; margin-bottom: 0;">
+            <p style="font-size: 0.83rem; color: #6E5752; line-height: 1.5; margin-top: 6px; margin-bottom: 0;">
                 Aim for consistent sleep duration (7.5–8.5 hours). Maintaining steady circadian rhythms supports pituitary gonadotropin secretion and next-cycle vitality.
             </p>
         </div>
         """, unsafe_allow_html=True)
     with s2:
         st.markdown("""
-        <div style="background: #F4F7F2; border: 1px solid #C8D7C2; border-top: 3px solid var(--color-sage); border-radius: 10px; padding: 16px; font-size: 0.88rem; height: 100%;">
-            <div style="font-size: 1.15rem; margin-bottom: 4px;">💧</div>
+        <div style="background: #F4F7F2; border: 1px solid #C8D7C2; border-top: 3px solid var(--color-sage); border-radius: 8px; padding: 14px; font-size: 0.86rem; height: 100%;">
             <b style="color: #59433F;">Nutritional Hydration</b>
-            <p style="font-size: 0.84rem; color: #6E5752; line-height: 1.5; margin-top: 6px; margin-bottom: 0;">
+            <p style="font-size: 0.83rem; color: #6E5752; line-height: 1.5; margin-top: 6px; margin-bottom: 0;">
                 Adequate daily water intake (2+ liters) and electrolyte-rich whole foods assist cellular hydration and support comfort throughout menstruation.
             </p>
         </div>
         """, unsafe_allow_html=True)
     with s3:
         st.markdown("""
-        <div style="background: #FAF7F5; border: 1px solid #EADBCE; border-top: 3px solid var(--color-mauve); border-radius: 10px; padding: 16px; font-size: 0.88rem; height: 100%;">
-            <div style="font-size: 1.15rem; margin-bottom: 4px;">🌿</div>
+        <div style="background: #FAF7F5; border: 1px solid #EADBCE; border-top: 3px solid var(--color-mauve); border-radius: 8px; padding: 14px; font-size: 0.86rem; height: 100%;">
             <b style="color: #59433F;">Stress Regulation Practices</b>
-            <p style="font-size: 0.84rem; color: #6E5752; line-height: 1.5; margin-top: 6px; margin-bottom: 0;">
+            <p style="font-size: 0.83rem; color: #6E5752; line-height: 1.5; margin-top: 6px; margin-bottom: 0;">
                 Because stress exerts a significant negative standardized coefficient in the model, daily down-regulation (gentle walking, mindfulness) helps protect cycle continuity.
             </p>
         </div>
@@ -1119,8 +1149,8 @@ def render_prediction_results(result, inputs: Optional[Dict[str, Any]]):
     # Model Limitations Card
     st.markdown("""
     <div class="callout-lavender">
-        <b style="color: #59433F; font-size: 0.92rem;">🛡️ Model Limitations & Clinical Boundary Notice:</b><br>
-        <span style="font-size: 0.86rem; color: #59433F; line-height: 1.55;">
+        <b style="color: #59433F; font-size: 0.90rem;">Model Limitations & Clinical Boundary Notice:</b><br>
+        <span style="font-size: 0.85rem; color: #59433F; line-height: 1.55;">
         This prediction was generated by an experimental Ridge Regression pipeline (test R² = 0.4620, MAE = 0.6448). 
         The model has not been clinically validated on diverse real-world populations. 
         It does not diagnose any medical condition (such as endometriosis or PCOS), does not evaluate pregnancy or maternal health, 
@@ -1181,6 +1211,7 @@ def render_cycle_information(cohort_df: Optional[pd.DataFrame] = None):
     if cohort_df is None:
         cohort_df = get_cohort_dataset()
 
+    st.markdown('<div class="badge-pill">Physiological Reference</div>', unsafe_allow_html=True)
     st.markdown("<h1>Menstrual Cycle Biology & Empirical Patterns</h1>", unsafe_allow_html=True)
     st.markdown(
         "A healthy menstrual cycle typically spans 21 to 35 days, orchestrated by rhythmic fluctuations "
@@ -1190,9 +1221,9 @@ def render_cycle_information(cohort_df: Optional[pd.DataFrame] = None):
 
     # Crucial Distinction Banner
     st.markdown("""
-    <div class="callout-lavender" style="margin-bottom: 24px;">
-        <b style="color: #59433F; font-size: 0.95rem;">⚠️ Crucial Distinction: Educational Biology vs. Algorithmic Health Forecast</b><br>
-        <span style="font-size: 0.88rem; color: #59433F; line-height: 1.55;">
+    <div class="callout-lavender" style="margin-bottom: 22px;">
+        <b style="color: #59433F; font-size: 0.92rem;">Crucial Distinction: Educational Biology vs. Algorithmic Health Forecast</b><br>
+        <span style="font-size: 0.86rem; color: #59433F; line-height: 1.55;">
         The physiological cycle timeline, hormonal transitions, and lifestyle recommendations presented on this page 
         serve purely general educational and physiological literacy purposes. 
         <b>HERAI does not predict calendar period start dates, fertile windows, ovulation dates, or pregnancy probabilities.</b> 
@@ -1212,9 +1243,9 @@ def render_cycle_information(cohort_df: Optional[pd.DataFrame] = None):
     cv_c1, cv_c2 = st.columns(2, gap="medium")
     with cv_c1:
         st.markdown("""
-        <div style="background: #FAF7F5; border-left: 3px solid #B97B8A; padding: 14px 16px; border-radius: 6px; margin-bottom: 12px;">
+        <div style="background: #FAF7F5; border-left: 3px solid #B97B8A; padding: 13px 15px; border-radius: 6px; margin-bottom: 12px;">
             <b style="color: #59433F;">Current Cycle Indicators:</b>
-            <ul style="font-size: 0.86rem; color: #59433F; line-height: 1.6; margin-top: 6px; padding-left: 18px;">
+            <ul style="font-size: 0.85rem; color: #59433F; line-height: 1.6; margin-top: 6px; padding-left: 18px;">
                 <li><b>Cycle Length (<code>cycle_length_days</code>):</b> Observed duration from cycle onset to next period (cohort mean: 27.8 ± 2.4 days).</li>
                 <li><b>Cycle Phase (<code>cycle_phase</code>):</b> Self-reported phase at log entry (Menstrual, Follicular, or Luteal).</li>
                 <li><b>Menstrual Flow (<code>flow_level</code>):</b> Categorical flow volume (Light, Moderate, or Heavy).</li>
@@ -1226,9 +1257,9 @@ def render_cycle_information(cohort_df: Optional[pd.DataFrame] = None):
 
     with cv_c2:
         st.markdown("""
-        <div style="background: #FAF7F5; border-left: 3px solid #A8B8A0; padding: 14px 16px; border-radius: 6px; margin-bottom: 12px;">
+        <div style="background: #FAF7F5; border-left: 3px solid #A8B8A0; padding: 13px 15px; border-radius: 6px; margin-bottom: 12px;">
             <b style="color: #59433F;">Prior-Cycle Lag & Lifestyle Indicators:</b>
-            <ul style="font-size: 0.86rem; color: #59433F; line-height: 1.6; margin-top: 6px; padding-left: 18px;">
+            <ul style="font-size: 0.85rem; color: #59433F; line-height: 1.6; margin-top: 6px; padding-left: 18px;">
                 <li><b>Previous Health & Pain (<code>previous_health_score</code>, <code>previous_pain_level</code>):</b> Autoregressive continuity from cycle <i>t - 1</i>.</li>
                 <li><b>Previous Cycle Length (<code>previous_cycle_length_days</code>):</b> Rhythm stability indicator.</li>
                 <li><b>Stress & Sleep Metrics (<code>stress_score_cycle</code>, <code>sleep_hours_cycle</code>):</b> Cyclical nervous system load and restorative rest.</li>
@@ -1241,7 +1272,7 @@ def render_cycle_information(cohort_df: Optional[pd.DataFrame] = None):
     st.markdown("<div style='margin-top: 14px;'></div>", unsafe_allow_html=True)
 
     # Section 2: Empirical Observed Patterns in Cohort Data
-    st.markdown("### Empirical Cohort Patterns (N=15,976 Cycles)")
+    st.markdown("### Empirical Cohort Patterns (N = 15,976 Cycles)")
     st.caption("Visualizing real patterns logged across 2,000 anonymized cohort profiles.")
 
     pat_c1, pat_c2 = st.columns(2, gap="medium")
@@ -1277,10 +1308,10 @@ def render_cycle_information(cohort_df: Optional[pd.DataFrame] = None):
         st.markdown("""
         <div class="card-surface" style="border-top: 3px solid #B97B8A;">
             <div class="card-header-serif">1. Menstrual Phase (Days 1–5)</div>
-            <p style="font-size: 0.9rem; line-height: 1.5; color: #59433F;">
+            <p style="font-size: 0.88rem; line-height: 1.5; color: #59433F;">
                 <b>Endocrine Dynamics:</b> Estrogen and progesterone drop to baseline levels, signaling the shedding of the uterine lining (stratum functionale).
             </p>
-            <ul style="font-size: 0.85rem; line-height: 1.55; padding-left: 18px; color: #59433F;">
+            <ul style="font-size: 0.84rem; line-height: 1.55; padding-left: 18px; color: #59433F;">
                 <li><b>Physiological Focus:</b> Restorative recovery, iron replenishment, gentle movement.</li>
                 <li><b>Nutritional Support:</b> Warm mineral broths, dark leafy greens, magnesium-rich seeds, hydration.</li>
                 <li><b>Comfort Measures:</b> Gentle heat application, warm baths, restorative diaphragmatic breathing.</li>
@@ -1291,10 +1322,10 @@ def render_cycle_information(cohort_df: Optional[pd.DataFrame] = None):
         st.markdown("""
         <div class="card-surface" style="border-top: 3px solid #D99AA5;">
             <div class="card-header-serif">2. Follicular Phase (Days 6–13)</div>
-            <p style="font-size: 0.9rem; line-height: 1.5; color: #59433F;">
+            <p style="font-size: 0.88rem; line-height: 1.5; color: #59433F;">
                 <b>Endocrine Dynamics:</b> Pituitary FSH stimulates ovarian follicle development; ascending estradiol thickens the endometrium.
             </p>
-            <ul style="font-size: 0.85rem; line-height: 1.55; padding-left: 18px; color: #59433F;">
+            <ul style="font-size: 0.84rem; line-height: 1.55; padding-left: 18px; color: #59433F;">
                 <li><b>Physiological Focus:</b> Rising physical stamina, cognitive sharpness, cellular energy.</li>
                 <li><b>Nutritional Support:</b> Complex carbohydrates, fermented probiotic foods, lean proteins.</li>
                 <li><b>Activity Alignment:</b> Progressive resistance training, aerobic conditioning, focused project work.</li>
@@ -1306,10 +1337,10 @@ def render_cycle_information(cohort_df: Optional[pd.DataFrame] = None):
         st.markdown("""
         <div class="card-surface" style="border-top: 3px solid #A8B8A0;">
             <div class="card-header-serif">3. Ovulatory Phase (Days 14–16)</div>
-            <p style="font-size: 0.9rem; line-height: 1.5; color: #59433F;">
+            <p style="font-size: 0.88rem; line-height: 1.5; color: #59433F;">
                 <b>Endocrine Dynamics:</b> Estrogen peak triggers a sharp LH (luteinizing hormone) surge, stimulating the release of a mature ovum.
             </p>
-            <ul style="font-size: 0.85rem; line-height: 1.55; padding-left: 18px; color: #59433F;">
+            <ul style="font-size: 0.84rem; line-height: 1.55; padding-left: 18px; color: #59433F;">
                 <li><b>Physiological Focus:</b> Peak metabolic rate, elevated stamina, enhanced verbal acuity.</li>
                 <li><b>Nutritional Support:</b> Antioxidant-dense berries, zinc, cruciferous vegetables supporting estrogen metabolism.</li>
                 <li><b>Activity Alignment:</b> High-intensity interval workouts, collaborative group efforts.</li>
@@ -1320,10 +1351,10 @@ def render_cycle_information(cohort_df: Optional[pd.DataFrame] = None):
         st.markdown("""
         <div class="card-surface" style="border-top: 3px solid #C97A3E;">
             <div class="card-header-serif">4. Luteal Phase (Days 17–28)</div>
-            <p style="font-size: 0.9rem; line-height: 1.5; color: #59433F;">
+            <p style="font-size: 0.88rem; line-height: 1.5; color: #59433F;">
                 <b>Endocrine Dynamics:</b> The ruptured follicle forms the corpus luteum, secreting progesterone to support the endometrium.
             </p>
-            <ul style="font-size: 0.85rem; line-height: 1.55; padding-left: 18px; color: #59433F;">
+            <ul style="font-size: 0.84rem; line-height: 1.55; padding-left: 18px; color: #59433F;">
                 <li><b>Physiological Focus:</b> Nervous system down-regulation, steady blood glucose, sleep hygiene.</li>
                 <li><b>Nutritional Support:</b> Vitamin B6, pumpkin and sunflower seeds, complex root vegetables.</li>
                 <li><b>Activity Alignment:</b> Moderate pilates, nature walks, calming evening wind-down rituals.</li>
@@ -1334,9 +1365,9 @@ def render_cycle_information(cohort_df: Optional[pd.DataFrame] = None):
     st.markdown("<div style='margin-top: 14px;'></div>", unsafe_allow_html=True)
 
     # Section 4: Clinical Red Flags
-    st.markdown('<div class="card-surface" style="border-left: 4px solid #C97A3E;"><div class="card-header-serif">🩺 When to Seek Medical Attention (Clinical Red Flags)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card-surface" style="border-left: 4px solid #C97A3E;"><div class="card-header-serif">When to Seek Medical Attention (Clinical Red Flags)</div>', unsafe_allow_html=True)
     st.markdown("""
-    <div style="font-size: 0.88rem; color: #59433F; line-height: 1.6;">
+    <div style="font-size: 0.86rem; color: #59433F; line-height: 1.6;">
     Please consult a certified gynecologist, endocrinologist, or primary care provider if you experience any of the following clinical warning signs:
     <ul>
         <li><b>Debilitating Dysmenorrhea:</b> Severe pelvic cramping that does not respond to standard OTC analgesics, disrupts work or daily life, or worsens progressively.</li>
@@ -1355,7 +1386,7 @@ def render_cycle_information(cohort_df: Optional[pd.DataFrame] = None):
 # =============================================================================
 def render_model_insights(predictor: Optional[HerAIPredictor] = None):
     """Render technical model card, evaluation benchmarks, and leakage audit verification."""
-    st.markdown('<div class="badge-pill">📊 Rigorous ML Validation & Benchmarking</div>', unsafe_allow_html=True)
+    st.markdown('<div class="badge-pill">Validation & Benchmarking</div>', unsafe_allow_html=True)
     st.markdown("<h1>Model Insights & Technical Architecture</h1>", unsafe_allow_html=True)
     st.markdown(
         "HERAI applies an L2-regularized Ridge Regression pipeline trained on 15,976 evaluated cycles. "
@@ -1367,7 +1398,7 @@ def render_model_insights(predictor: Optional[HerAIPredictor] = None):
     km_c1, km_c2, km_c3, km_c4 = st.columns(4)
     with km_c1:
         st.markdown("""
-        <div class="metric-stat-box" style="border-top: 3.5px solid var(--color-mauve);">
+        <div class="metric-stat-box" style="border-top: 3px solid var(--color-mauve);">
             <div class="metric-stat-label">Production Algorithm</div>
             <div class="metric-stat-value" style="font-size: 1.35rem; padding-top: 4px;">Ridge Regression</div>
             <div class="metric-stat-detail">L2 Regularization (α = 1.0)</div>
@@ -1375,7 +1406,7 @@ def render_model_insights(predictor: Optional[HerAIPredictor] = None):
         """, unsafe_allow_html=True)
     with km_c2:
         st.markdown("""
-        <div class="metric-stat-box" style="border-top: 3.5px solid var(--color-sage);">
+        <div class="metric-stat-box" style="border-top: 3px solid var(--color-sage);">
             <div class="metric-stat-label" style="color: #4D6B45;">Active Feature Set</div>
             <div class="metric-stat-value">37 Features</div>
             <div class="metric-stat-detail">Lab & lookahead features excluded</div>
@@ -1383,7 +1414,7 @@ def render_model_insights(predictor: Optional[HerAIPredictor] = None):
         """, unsafe_allow_html=True)
     with km_c3:
         st.markdown("""
-        <div class="metric-stat-box" style="border-top: 3.5px solid var(--color-dusty-rose);">
+        <div class="metric-stat-box" style="border-top: 3px solid var(--color-dusty-rose);">
             <div class="metric-stat-label" style="color: #9E5664;">Test Set MAE</div>
             <div class="metric-stat-value">0.6448</div>
             <div class="metric-stat-detail">Average error on 0–10 scale</div>
@@ -1391,7 +1422,7 @@ def render_model_insights(predictor: Optional[HerAIPredictor] = None):
         """, unsafe_allow_html=True)
     with km_c4:
         st.markdown("""
-        <div class="metric-stat-box" style="border-top: 3.5px solid var(--color-amber);">
+        <div class="metric-stat-box" style="border-top: 3px solid var(--color-amber);">
             <div class="metric-stat-label" style="color: #A35216;">Test Set R²</div>
             <div class="metric-stat-value">0.4620</div>
             <div class="metric-stat-detail">46.2% cyclical variance explained</div>
@@ -1401,7 +1432,7 @@ def render_model_insights(predictor: Optional[HerAIPredictor] = None):
     st.markdown("<div style='margin-top: 14px;'></div>", unsafe_allow_html=True)
 
     # Section 1: Candidate Comparison & Benchmark Evaluation
-    st.markdown("### Candidate Model Benchmarking (Test Set: N=3,176 Cycles across 400 Users)")
+    st.markdown("### Candidate Model Benchmarking (Test Set: N = 3,176 Cycles across 400 Users)")
     st.caption("Strict user-level isolation: 0% user overlap between training and test sets.")
 
     m_c1, m_c2 = st.columns([1.1, 0.9], gap="medium")
@@ -1415,7 +1446,7 @@ def render_model_insights(predictor: Optional[HerAIPredictor] = None):
                 "Test MAE": "0.6448",
                 "Test RMSE": "0.8025",
                 "Test R²": "0.4620",
-                "Status": "👑 Selected Production"
+                "Status": "Selected Production"
             },
             {
                 "Candidate Model": "Ridge Regression (42 features)",
@@ -1445,7 +1476,7 @@ def render_model_insights(predictor: Optional[HerAIPredictor] = None):
         st.dataframe(bench_df, hide_index=True, use_container_width=True)
 
         st.markdown("""
-        <div style="font-size: 0.86rem; color: #59433F; line-height: 1.55; margin-top: 8px;">
+        <div style="font-size: 0.85rem; color: #59433F; line-height: 1.55; margin-top: 8px;">
             <b>Why Ridge (37 Features) Was Selected:</b>
             <ul style="padding-left: 18px; margin-top: 4px;">
                 <li><b>Omits Invasive Lab Biomarkers:</b> Excluded <code>estrogen_pgml</code>, <code>progesterone_ngml</code>, and <code>ovulation_result</code>, which require venipuncture blood draws or clinical testing impractical for everyday self-monitoring.</li>
@@ -1470,7 +1501,7 @@ def render_model_insights(predictor: Optional[HerAIPredictor] = None):
         st.markdown("""
         <div style="background: #FAF7F5; border-radius: 8px; padding: 14px; height: 100%;">
             <b style="color: #882D52;">Mean Absolute Error (MAE = 0.6448)</b>
-            <p style="font-size: 0.85rem; color: #59433F; line-height: 1.5; margin-top: 6px;">
+            <p style="font-size: 0.84rem; color: #59433F; line-height: 1.5; margin-top: 6px;">
                 On average, the model's predicted health score is within <b>0.64 points</b> of the user's actual health score in the next cycle (on a 0 to 10 scale). 
                 This represents an average deviation of just 6.4% across the entire scoring spectrum.
             </p>
@@ -1480,7 +1511,7 @@ def render_model_insights(predictor: Optional[HerAIPredictor] = None):
         st.markdown("""
         <div style="background: #FAF7F5; border-radius: 8px; padding: 14px; height: 100%;">
             <b style="color: #882D52;">Root Mean Squared Error (RMSE = 0.8025)</b>
-            <p style="font-size: 0.85rem; color: #59433F; line-height: 1.5; margin-top: 6px;">
+            <p style="font-size: 0.84rem; color: #59433F; line-height: 1.5; margin-top: 6px;">
                 Like MAE, but squares individual errors prior to averaging, making it more sensitive to large outliers. 
                 The low RMSE of <b>0.8025</b> confirms that large, erratic forecasting errors rarely occur across test cycles.
             </p>
@@ -1490,7 +1521,7 @@ def render_model_insights(predictor: Optional[HerAIPredictor] = None):
         st.markdown("""
         <div style="background: #FAF7F5; border-radius: 8px; padding: 14px; height: 100%;">
             <b style="color: #882D52;">Coefficient of Determination (R² = 0.4620)</b>
-            <p style="font-size: 0.85rem; color: #59433F; line-height: 1.5; margin-top: 6px;">
+            <p style="font-size: 0.84rem; color: #59433F; line-height: 1.5; margin-top: 6px;">
                 Measures how much of the cyclical score variation is explained by the model compared to simply guessing the cohort average. 
                 An R² of <b>0.4620</b> means the model captures ~46.2% of the variance using observational parameters alone.
             </p>
@@ -1518,7 +1549,7 @@ def render_model_insights(predictor: Optional[HerAIPredictor] = None):
         st.markdown("""
         <div class="card-surface" style="height: 100%;">
             <div class="card-header-serif">Physiological Interpretation</div>
-            <div style="font-size: 0.86rem; color: #59433F; line-height: 1.6;">
+            <div style="font-size: 0.85rem; color: #59433F; line-height: 1.6;">
                 <p><b>1. Baseline Stress (−0.672):</b> Chronic stress is the single strongest negative statistical driver in the model, demonstrating how sustained hypothalamic-pituitary-adrenal (HPA) activation suppresses cycle vitality.</p>
                 <p><b>2. Autoregressive Continuity (+0.453 &amp; +0.404):</b> Current health score and previous cycle health score provide strong positive continuity, reflecting physiological momentum across consecutive cycles.</p>
                 <p><b>3. Pain &amp; Cramping Impact (+0.291 standardized coefficient):</b> Reflects the empirical co-variation between severe dysmenorrhea and cyclical disruption.</p>
@@ -1534,7 +1565,7 @@ def render_model_insights(predictor: Optional[HerAIPredictor] = None):
     # Section 4: Data Leakage Audit & Preprocessing Safeguards
     st.markdown('<div class="card-surface"><div class="card-header-serif">Data Leakage Audit & Preprocessing Safeguards</div>', unsafe_allow_html=True)
     st.markdown("""
-    <div style="font-size: 0.88rem; color: #59433F; line-height: 1.6;">
+    <div style="font-size: 0.86rem; color: #59433F; line-height: 1.6;">
     To guarantee scientific integrity and prevent optimistic performance overestimation, the HERAI ML pipeline enforces three strict architectural safeguards:
     <ol style="padding-left: 20px; margin-top: 8px;">
         <li><b>Zero User Overlap (<code>GroupShuffleSplit</code>):</b> All cycles for a given user belong exclusively to the training split (1,600 users) or the test split (400 users). The model is evaluated strictly on unseen individuals, preventing identity leakage.</li>
@@ -1549,9 +1580,9 @@ def render_model_insights(predictor: Optional[HerAIPredictor] = None):
 
     # Section 5: Clinical Boundary & Ethical Evaluation Notice
     st.markdown("""
-    <div class="disclaimer-card" style="border-left-width: 5px;">
-        <b style="color: #882D52; font-size: 0.95rem;">Honest Evaluation &amp; Clinical Boundary Notice:</b><br>
-        <span style="font-size: 0.88rem; color: #59433F; line-height: 1.55;">
+    <div class="disclaimer-card" style="border-left-width: 4px;">
+        <b style="color: #882D52; font-size: 0.92rem;">Honest Evaluation &amp; Clinical Boundary Notice:</b><br>
+        <span style="font-size: 0.86rem; color: #59433F; line-height: 1.55;">
         A model performing better on this test split does <b>NOT</b> demonstrate clinical accuracy, diagnostic safety, or therapeutic efficacy on external real-world patient populations. 
         The HERAI model is an educational and exploratory machine learning prototype trained on synthetic observational records. 
         It does not diagnose gynecological disorders (such as endometriosis, fibroids, or PCOS), does not assess fertility or pregnancy viability, 
@@ -1566,7 +1597,7 @@ def render_model_insights(predictor: Optional[HerAIPredictor] = None):
 # =============================================================================
 def render_about():
     """Render Project Background, Architecture, Privacy Policy, and Disclaimers."""
-    st.markdown('<div class="badge-pill">ℹ️ Open-Source Research Prototype</div>', unsafe_allow_html=True)
+    st.markdown('<div class="badge-pill">Research Overview</div>', unsafe_allow_html=True)
     st.markdown("<h1>About HERAI</h1>", unsafe_allow_html=True)
     st.markdown(
         "HERAI is an open-source machine learning and healthcare data-science research prototype "
@@ -1579,12 +1610,12 @@ def render_about():
         st.markdown("""
         <div class="card-surface">
             <div class="card-header-serif">Project Purpose & Origins</div>
-            <p style="font-size: 0.9rem; line-height: 1.55;">
+            <p style="font-size: 0.88rem; line-height: 1.55;">
                 Menstrual health remains historically under-represented in statistical predictive modeling. 
                 HERAI demonstrates an end-to-end data science lifecycle: from raw record ingestion, schema validation, 
                 and chronological lag feature engineering, to model comparison, leakage verification, and ethical inference.
             </p>
-            <p style="font-size: 0.9rem; line-height: 1.55;">
+            <p style="font-size: 0.88rem; line-height: 1.55;">
                 <b>Dataset Composition:</b> 17,976 raw cycle records across 2,000 unique user profiles, yielding 15,976 training records with verified next-cycle targets.
             </p>
         </div>
@@ -1594,11 +1625,11 @@ def render_about():
         st.markdown("""
         <div class="card-surface">
             <div class="card-header-serif">Data Privacy & Security</div>
-            <p style="font-size: 0.9rem; line-height: 1.55;">
+            <p style="font-size: 0.88rem; line-height: 1.55;">
                 <b>Local In-Memory Execution:</b> All user entries submitted through this web interface are processed 
                 entirely in-memory within your local Python runtime. 
             </p>
-            <p style="font-size: 0.9rem; line-height: 1.55;">
+            <p style="font-size: 0.88rem; line-height: 1.55;">
                 <b>Zero Stranger-Data Substitution:</b> The prediction pipeline never borrows or copies records from other individuals in the dataset. 
                 For first-time users, learned cohort medians from the training split serve as documented reference baselines.
             </p>
@@ -1637,7 +1668,7 @@ def main():
 
     # Persistent calm footer
     st.markdown("""
-    <div style="text-align: center; font-size: 0.78rem; color: #8F7B76; margin-top: 40px; padding-top: 16px; border-top: 1px solid #F0E2DA;">
+    <div style="text-align: center; font-size: 0.78rem; color: #8F7B76; margin-top: 36px; padding-top: 16px; border-top: 1px solid #F0E2DA;">
         HERAI — Menstrual Health Intelligence Prototype &nbsp;|&nbsp; Educational & Data-Driven ML System &nbsp;|&nbsp; Non-Diagnostic
     </div>
     """, unsafe_allow_html=True)
