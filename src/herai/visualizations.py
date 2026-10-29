@@ -44,20 +44,22 @@ def create_cycle_wave_hero() -> go.Figure:
         x=days,
         y=wave,
         mode="lines",
-        line=dict(color=PALETTE["mauve"], width=2.6, shape="spline"),
+        line=dict(color=PALETTE["mauve"], width=2.8, shape="spline"),
+        fill="tozeroy",
+        fillcolor="rgba(217, 154, 165, 0.14)",
         hoverinfo="skip",
         showlegend=False,
     ))
 
     milestone_days = [1, 7, 14, 21, 28]
-    milestone_labels = ["Day 1: Menstrual", "Day 7: Follicular", "Day 14: Ovulatory", "Day 21: Luteal", "Day 28: Close"]
+    milestone_labels = ["Day 1: Menstrual", "Day 7: Follicular", "Day 14: Ovulatory", "Day 21: Luteal", "Day 28: Cycle End"]
     milestone_y = [8.0 + 1.2 * np.sin((d - 5) / 28.0 * 2 * np.pi) + 0.3 * np.cos((d - 14) / 14.0 * 2 * np.pi) for d in milestone_days]
 
     fig.add_trace(go.Scatter(
         x=milestone_days,
         y=milestone_y,
         mode="markers+text",
-        marker=dict(size=8, color=PALETTE["cocoa"], line=dict(color=PALETTE["peach"], width=2)),
+        marker=dict(size=9, color=PALETTE["mauve"], line=dict(color=PALETTE["white"], width=2)),
         text=["Day 1", "Day 7", "Day 14", "Day 21", "Day 28"],
         textposition="top center",
         textfont=dict(family=FONT_SANS, size=10, color=PALETTE["cocoa"]),
@@ -72,7 +74,7 @@ def create_cycle_wave_hero() -> go.Figure:
         height=150,
         margin=dict(l=15, r=15, t=20, b=20),
         xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[0, 29]),
-        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[6.2, 10.0]),
+        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[6.0, 10.2]),
     )
     return fig
 
