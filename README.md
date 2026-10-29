@@ -100,9 +100,10 @@ Models evaluated on the same 80/20 user-grouped split (`GroupShuffleSplit`, 1,60
 
 | Model | MAE | RMSE | R² Score | Description |
 |---|---:|---:|---:|---|
+| **Ridge Without Audited Features (37 features)** | **0.6448** | **0.8025** | **0.4620** | **Selected production model** (excludes lab/lookahead features) |
 | Ridge Regression (42 features) | 0.6452 | 0.8029 | 0.4616 | Includes all features (some lab/inaccessible at home) |
 | Random Forest (42 features) | 0.6550 | 0.8130 | 0.4480 | Non-linear tree ensemble |
-| **Ridge Without Audited Features (37 features)** | **0.6448** | **0.8025** | **0.4620** | **Selected production candidate** (excludes lab/timing features) |
+| Dummy Mean Baseline | 0.9113 | 1.0942 | -0.0000 | Null baseline predicting training target mean |
 
 ---
 

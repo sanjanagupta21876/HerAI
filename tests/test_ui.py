@@ -12,6 +12,9 @@ from herai.visualizations import (
     create_cycle_length_distribution_chart,
     create_user_trajectory_chart,
     create_feature_importance_chart,
+    create_model_comparison_bar_chart,
+    create_phase_distribution_chart,
+    create_pain_vs_health_chart,
 )
 
 
@@ -89,3 +92,31 @@ def test_feature_importance_chart():
     coefs = [-0.35, -0.65, 0.12]
     fig = create_feature_importance_chart(names, coefs, top_n=3)
     assert isinstance(fig, go.Figure)
+
+
+def test_model_comparison_bar_chart():
+    """Verify model benchmark bar chart generates with 2 error metrics."""
+    fig = create_model_comparison_bar_chart()
+    assert isinstance(fig, go.Figure)
+    assert len(fig.data) == 2  # MAE and RMSE traces
+
+
+def test_phase_distribution_chart():
+    """Verify observed cycle phase bar chart."""
+    toy_df = pd.DataFrame({
+        "cycle_phase": ["Luteal", "Follicular", "Luteal", "Menstrual", "Follicular"]
+    })
+    fig = create_phase_distribution_chart(toy_df)
+    assert isinstance(fig, go.Figure)
+    assert len(fig.data) == 1
+
+
+def test_pain_vs_health_chart():
+    """Verify pain level vs mean health score relationship chart."""
+    toy_df = pd.DataFrame({
+        "pain_level": [1, 2, 3, 5, 8],
+        "overall_health_score": [9.5, 9.0, 8.5, 7.5, 6.0]
+    })
+    fig = create_pain_vs_health_chart(toy_df)
+    assert isinstance(fig, go.Figure)
+    assert len(fig.data) == 1
