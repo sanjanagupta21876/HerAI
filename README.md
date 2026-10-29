@@ -71,6 +71,7 @@ HERAI/
 │       └── 06_compare_models.py    # Backward-compatibility forwarding stub
 ├── tests/
 │   ├── test_herai.py               # Core ML pipeline & inference unit tests
+│   ├── test_qa_pipeline.py         # End-to-end QA, presets, bounds & script tests
 │   └── test_ui.py                  # Visualization & UI component unit tests
 ├── pyproject.toml                  # Package configuration & pytest settings
 ├── requirements.txt                # Dependency manifest
