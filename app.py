@@ -378,7 +378,11 @@ st.markdown("""
     }
 
     /* Primary and Secondary CTA Buttons */
-    button[kind="primary"], [data-testid="stBaseButton-primary"] {
+    button[kind="primary"],
+    [data-testid="stBaseButton-primary"],
+    button[kind="primaryFormSubmit"],
+    [data-testid="stFormSubmitButton"] button,
+    [data-testid="baseButton-primaryFormSubmit"] {
         background: var(--color-mauve) !important;
         color: var(--color-white) !important;
         font-family: var(--font-sans) !important;
@@ -392,18 +396,30 @@ st.markdown("""
         transition: all 0.2s ease !important;
         cursor: pointer !important;
     }
-    button[kind="primary"]:hover, [data-testid="stBaseButton-primary"]:hover {
+    button[kind="primary"]:hover,
+    [data-testid="stBaseButton-primary"]:hover,
+    button[kind="primaryFormSubmit"]:hover,
+    [data-testid="stFormSubmitButton"] button:hover,
+    [data-testid="baseButton-primaryFormSubmit"]:hover {
         background: var(--color-mauve-dark) !important;
         color: var(--color-white) !important;
         box-shadow: 0 4px 12px rgba(185, 123, 138, 0.35) !important;
         transform: translateY(-1px) !important;
     }
-    button[kind="primary"]:active, [data-testid="stBaseButton-primary"]:active {
+    button[kind="primary"]:active,
+    [data-testid="stBaseButton-primary"]:active,
+    button[kind="primaryFormSubmit"]:active,
+    [data-testid="stFormSubmitButton"] button:active,
+    [data-testid="baseButton-primaryFormSubmit"]:active {
         transform: translateY(0) !important;
         box-shadow: 0 1px 4px rgba(185, 123, 138, 0.2) !important;
     }
 
-    button[kind="secondary"], [data-testid="stBaseButton-secondary"] {
+    button[kind="secondary"],
+    [data-testid="stBaseButton-secondary"],
+    button[kind="secondaryFormSubmit"],
+    [data-testid="baseButton-secondaryFormSubmit"],
+    .stButton > button {
         background: var(--color-white) !important;
         color: var(--color-cocoa) !important;
         font-family: var(--font-sans) !important;
@@ -417,23 +433,196 @@ st.markdown("""
         transition: all 0.2s ease !important;
         cursor: pointer !important;
     }
-    button[kind="secondary"]:hover, [data-testid="stBaseButton-secondary"]:hover {
+    button[kind="secondary"]:hover,
+    [data-testid="stBaseButton-secondary"]:hover,
+    button[kind="secondaryFormSubmit"]:hover,
+    .stButton > button:hover {
         background: #FAF3EE !important;
         border-color: var(--color-mauve) !important;
         color: var(--color-mauve-dark) !important;
         transform: translateY(-1px) !important;
     }
-    button[kind="secondary"]:active, [data-testid="stBaseButton-secondary"]:active {
+    button[kind="secondary"]:active,
+    [data-testid="stBaseButton-secondary"]:active,
+    .stButton > button:active {
         transform: translateY(0) !important;
     }
 
-    /* Fallback default button */
-    .stButton>button {
-        border-radius: 8px;
-        min-height: 42px;
-        font-weight: 600;
-        font-size: 0.94rem;
-        transition: all 0.2s ease;
+    /* Form Inputs, Text Inputs & Password Fields */
+    div[data-baseweb="input"],
+    div[data-baseweb="base-input"],
+    [data-testid="stTextInput"] div[data-baseweb="input"],
+    [data-testid="stNumberInput"] div[data-baseweb="input"],
+    [data-testid="stDateInput"] div[data-baseweb="input"],
+    [data-testid="stTextArea"] div[data-baseweb="textarea"] {
+        background-color: var(--color-white) !important;
+        border: 1.5px solid #E2D1C9 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 1px 3px rgba(89, 67, 63, 0.03) !important;
+        transition: all 0.18s ease-in-out !important;
+    }
+    div[data-baseweb="input"]:focus-within,
+    div[data-baseweb="base-input"]:focus-within,
+    [data-testid="stTextInput"] div[data-baseweb="input"]:focus-within,
+    [data-testid="stNumberInput"] div[data-baseweb="input"]:focus-within,
+    [data-testid="stDateInput"] div[data-baseweb="input"]:focus-within,
+    [data-testid="stTextArea"] div[data-baseweb="textarea"]:focus-within {
+        border-color: var(--color-mauve) !important;
+        box-shadow: 0 0 0 3px rgba(185, 123, 138, 0.15) !important;
+    }
+    [data-testid="stTextInput"] input,
+    [data-testid="stNumberInput"] input,
+    [data-testid="stDateInput"] input,
+    [data-testid="stTextArea"] textarea,
+    input[type="text"],
+    input[type="password"],
+    input[type="number"],
+    textarea {
+        background-color: var(--color-white) !important;
+        color: var(--color-cocoa) !important;
+        -webkit-text-fill-color: var(--color-cocoa) !important;
+        font-family: var(--font-sans) !important;
+        font-size: 0.92rem !important;
+        font-weight: 500 !important;
+    }
+    [data-testid="stTextInput"] input::placeholder,
+    [data-testid="stTextArea"] textarea::placeholder,
+    input::placeholder {
+        color: #A38C86 !important;
+        -webkit-text-fill-color: #A38C86 !important;
+        font-weight: 400 !important;
+    }
+    [data-testid="stTextInput"] button {
+        background: transparent !important;
+        border: none !important;
+        color: var(--color-cocoa-light) !important;
+    }
+    [data-testid="stTextInput"] button:hover {
+        color: var(--color-mauve) !important;
+    }
+    [data-testid="stTextInput"] button svg {
+        fill: var(--color-cocoa-light) !important;
+    }
+
+    /* Selectboxes and Dropdowns (Light, Warm, Themed - Eliminates Black Boxes) */
+    div[data-baseweb="select"],
+    [data-testid="stSelectbox"] div[data-baseweb="select"],
+    [data-testid="stMultiSelect"] div[data-baseweb="select"] {
+        background-color: var(--color-white) !important;
+        border-radius: 8px !important;
+    }
+    div[data-baseweb="select"] > div,
+    [data-testid="stSelectbox"] div[data-baseweb="select"] > div {
+        background-color: var(--color-white) !important;
+        border: 1.5px solid #E2D1C9 !important;
+        border-radius: 8px !important;
+        min-height: 42px !important;
+        box-shadow: 0 1px 3px rgba(89, 67, 63, 0.03) !important;
+        transition: all 0.18s ease-in-out !important;
+        cursor: pointer !important;
+    }
+    div[data-baseweb="select"] > div:hover,
+    [data-testid="stSelectbox"] div[data-baseweb="select"] > div:hover {
+        border-color: var(--color-mauve) !important;
+        background-color: #FAF6F4 !important;
+    }
+    div[data-baseweb="select"]:focus-within > div,
+    [data-testid="stSelectbox"] div[data-baseweb="select"]:focus-within > div {
+        border-color: var(--color-mauve) !important;
+        box-shadow: 0 0 0 3px rgba(185, 123, 138, 0.15) !important;
+    }
+    div[data-baseweb="select"] span,
+    div[data-baseweb="select"] div[aria-selected="true"],
+    div[data-baseweb="select"] [data-testid="stMarkdownContainer"] p,
+    [data-testid="stSelectbox"] div[data-baseweb="select"] span,
+    [data-testid="stSelectbox"] div[data-baseweb="select"] div {
+        color: var(--color-cocoa) !important;
+        font-family: var(--font-sans) !important;
+        font-size: 0.92rem !important;
+        font-weight: 500 !important;
+    }
+    div[data-baseweb="select"] svg,
+    [data-testid="stSelectbox"] svg {
+        fill: var(--color-cocoa-light) !important;
+        color: var(--color-cocoa-light) !important;
+    }
+
+    /* Floating Popover / Dropdown Menu Options */
+    div[data-baseweb="popover"],
+    div[data-baseweb="popover"] > div,
+    div[data-baseweb="menu"],
+    ul[role="listbox"] {
+        background-color: var(--color-white) !important;
+        border: 1px solid #E2D1C9 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 8px 24px rgba(89, 67, 63, 0.10) !important;
+        padding: 4px !important;
+    }
+    li[role="option"] {
+        background-color: var(--color-white) !important;
+        color: var(--color-cocoa) !important;
+        font-family: var(--font-sans) !important;
+        font-size: 0.90rem !important;
+        font-weight: 500 !important;
+        border-radius: 6px !important;
+        padding: 8px 14px !important;
+        margin: 2px 0 !important;
+        transition: all 0.15s ease !important;
+    }
+    li[role="option"]:hover,
+    li[role="option"][aria-selected="true"] {
+        background-color: #FAF0EC !important;
+        color: var(--color-mauve-dark) !important;
+        font-weight: 600 !important;
+    }
+    li[role="option"] div,
+    li[role="option"] span {
+        color: inherit !important;
+        font-family: var(--font-sans) !important;
+    }
+
+    /* Number Input Stepper Buttons */
+    [data-testid="stNumberInput"] button {
+        background-color: #FAF5F2 !important;
+        color: var(--color-cocoa) !important;
+        border: 1px solid #E2D1C9 !important;
+        border-radius: 4px !important;
+    }
+    [data-testid="stNumberInput"] button:hover {
+        background-color: #F8E5DB !important;
+        color: var(--color-mauve-dark) !important;
+        border-color: var(--color-mauve) !important;
+    }
+    [data-testid="stNumberInput"] button svg {
+        fill: var(--color-cocoa) !important;
+    }
+
+    /* Sliders - Cohesive Mauve and Rose Accents */
+    [data-testid="stSlider"] div[data-baseweb="slider"] div[role="slider"] {
+        background-color: var(--color-mauve) !important;
+        border: 2px solid var(--color-white) !important;
+        box-shadow: 0 2px 6px rgba(185, 123, 138, 0.45) !important;
+        width: 18px !important;
+        height: 18px !important;
+    }
+    [data-testid="stSlider"] div[data-baseweb="slider"] div[role="slider"]:hover {
+        background-color: var(--color-mauve-dark) !important;
+        transform: scale(1.1) !important;
+    }
+    [data-testid="stSlider"] div[data-baseweb="slider"] > div:first-child > div:first-child {
+        background: #EFE4DC !important;
+    }
+    [data-testid="stSlider"] [data-testid="stTickBar"] div,
+    [data-testid="stSlider"] [data-testid="stTickBarMin"],
+    [data-testid="stSlider"] [data-testid="stTickBarMax"] {
+        color: var(--color-cocoa-light) !important;
+        font-family: var(--font-sans) !important;
+        font-size: 0.78rem !important;
+    }
+    [data-testid="stSlider"] div[data-testid="stMarkdownContainer"] p {
+        color: var(--color-cocoa) !important;
+        font-weight: 500 !important;
+        font-size: 0.88rem !important;
     }
 
     /* Accessible focus states for radio and inputs */
