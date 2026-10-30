@@ -616,9 +616,8 @@ def render_app_header():
             index=current_idx,
             horizontal=True,
             label_visibility="collapsed",
-            key="header_nav_radio"
         )
-        if selected and selected != st.session_state.current_page:
+        if selected is not None and selected != st.session_state.current_page:
             st.session_state.current_page = selected
             if selected == "Profile":
                 st.session_state.profile_edit_mode = False
@@ -641,12 +640,11 @@ def render_app_header():
                     st.rerun()
         else:
             if st.session_state.current_page == "Sign In":
-                st.markdown(
-                    '<div style="text-align: right;"><span class="step-pill" style="margin-right: 0;">Sign In</span></div>',
-                    unsafe_allow_html=True
-                )
+                if st.button("Explore as Guest", key="header_back_dash_btn", use_container_width=True, type="secondary"):
+                    st.session_state.current_page = "Dashboard"
+                    st.rerun()
             else:
-                if st.button("Sign In / Join", key="header_sign_in_btn", use_container_width=True, type="secondary"):
+                if st.button("Sign In / Join", key="header_sign_in_btn", use_container_width=True, type="primary"):
                     st.session_state.current_page = "Sign In"
                     st.rerun()
 
@@ -1832,16 +1830,20 @@ def _render_guest_dashboard(cohort_df: pd.DataFrame):
     st.markdown("<hr style='margin: 20px 0; border: none; border-top: 1px solid #F0E2DA;'>", unsafe_allow_html=True)
 
     # Guest Personalized Value Callout
-    st.markdown("""
-    <div style="background: #FAF7F5; border: 1px dashed #D99AA5; border-radius: 10px; padding: 16px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-        <div>
+    callout_c1, callout_c2 = st.columns([3.2, 1.2], vertical_alignment="center")
+    with callout_c1:
+        st.markdown("""
+        <div style="background: #FAF7F5; border: 1px dashed #D99AA5; border-radius: 10px; padding: 14px 18px; margin-bottom: 8px;">
             <b style="color: #59433F; font-size: 0.94rem;">Personalized Health Tracking Available</b>
             <div style="font-size: 0.85rem; color: #7A6560; margin-top: 2px;">
                 Create a private account to save your sequential cycle records, auto-fill baseline lifestyle inputs, and preserve your health patterns securely across sessions.
             </div>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
+    with callout_c2:
+        if st.button("Sign In / Join", key="btn_callout_auth", type="primary", use_container_width=True):
+            st.session_state.current_page = "Sign In"
+            st.rerun()
 
     # Overview Cards
     st.markdown("### System & Cohort Overview")
@@ -3076,3 +3078,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

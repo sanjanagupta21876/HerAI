@@ -1045,3 +1045,30 @@ def test_phase4_end_to_end_user_journey(temp_db):
     assert len(get_user_cycle_logs(user.id, db_path=temp_db)) == 0
 
 
+def test_signin_join_buttons_and_navigation_apptest():
+    """Verify in headless Streamlit AppTest that Sign In / Join buttons route to the authentication page."""
+    from streamlit.testing.v1 import AppTest
+
+    at = AppTest.from_file("app.py", default_timeout=30).run()
+    assert at.session_state.current_page == "Dashboard"
+
+    # Click header 'Sign In / Join' button
+    header_btn = [b for b in at.button if b.key == "header_sign_in_btn"]
+    assert len(header_btn) == 1
+    header_btn[0].click().run()
+    assert at.session_state.current_page == "Sign In"
+
+    # Click 'Explore as Guest' button on Sign In page
+    back_btn = [b for b in at.button if b.key == "header_back_dash_btn"]
+    assert len(back_btn) == 1
+    back_btn[0].click().run()
+    assert at.session_state.current_page == "Dashboard"
+
+    # Click hero banner 'Sign In / Join to Personalize' button
+    hero_btn = [b for b in at.button if b.key == "btn_hero_auth"]
+    assert len(hero_btn) == 1
+    hero_btn[0].click().run()
+    assert at.session_state.current_page == "Sign In"
+
+
+
