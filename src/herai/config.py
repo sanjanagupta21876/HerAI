@@ -1,5 +1,6 @@
 """Configuration and schema definitions for the HERAI project."""
 
+import os
 from pathlib import Path
 from typing import List, Dict, Any
 
@@ -12,6 +13,9 @@ DATA_DIR = PROJECT_ROOT / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
 MODELS_DIR = PROJECT_ROOT / "models"
+
+# Persistent database path
+DATABASE_PATH = Path(os.environ.get("HERAI_DB_PATH", str(DATA_DIR / "herai.db")))
 
 # Dataset file paths
 RAW_PERIOD_LOG_PATH = RAW_DATA_DIR / "Period_Log.csv"

@@ -41,6 +41,24 @@ from herai.visualizations import (
     create_pain_vs_health_chart,
     PALETTE,
 )
+from herai.auth import (
+    init_auth_session,
+    login_session_user,
+    logout_session_user,
+    get_current_user_id,
+    register_user,
+    authenticate,
+    AuthenticationError,
+)
+from herai.database import (
+    get_user_profile,
+    save_user_profile,
+    save_user_cycle_log,
+    get_user_cycle_logs,
+    get_next_cycle_number,
+    UserAlreadyExistsError,
+    ValidationError as DBValidationError,
+)
 
 # Page configuration - professional and clean, no emoji
 st.set_page_config(
@@ -50,7 +68,9 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Initialize navigation state
+# Initialize authentication and navigation session state
+init_auth_session()
+
 if "current_page" not in st.session_state:
     st.session_state.current_page = "Dashboard"
 
@@ -560,8 +580,8 @@ def get_cohort_dataset() -> pd.DataFrame:
 
 
 def render_app_header():
-    """Render the top clean application header with HERAI wordmark and navigation."""
-    nav_col1, nav_col2 = st.columns([1, 2.3], vertical_alignment="center")
+    """Render the top clean application header with HERAI wordmark, navigation, and user authentication state."""
+    nav_col1, nav_col2, nav_col3 = st.columns([1.1, 2.1, 0.9], vertical_alignment="center")
 
     with nav_col1:
         st.markdown("""
@@ -574,7 +594,7 @@ def render_app_header():
 
     with nav_col2:
         pages = ["Dashboard", "Health Prediction", "Cycle Information", "Model Insights", "About"]
-        current_idx = pages.index(st.session_state.current_page) if st.session_state.current_page in pages else 0
+        current_idx = pages.index(st.session_state.current_page) if st.session_state.current_page in pages else None
         selected = st.radio(
             "Navigation",
             pages,
@@ -583,11 +603,132 @@ def render_app_header():
             label_visibility="collapsed",
             key="header_nav_radio"
         )
-        if selected != st.session_state.current_page:
+        if selected and selected != st.session_state.current_page:
             st.session_state.current_page = selected
             st.rerun()
 
+    with nav_col3:
+        if st.session_state.get("authenticated") and st.session_state.get("current_user"):
+            user = st.session_state.current_user
+            user_display = user.get("username", "User")
+            acc_c1, acc_c2 = st.columns([1.2, 1.0], vertical_alignment="center")
+            with acc_c1:
+                st.markdown(
+                    f'<div style="text-align: right; line-height: 1.2;">'
+                    f'<span class="badge-pill" style="margin-bottom: 0; font-size: 0.72rem; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block;">'
+                    f'{user_display}</span>'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
+            with acc_c2:
+                if st.button("Sign Out", key="header_sign_out_btn", use_container_width=True, type="secondary"):
+                    logout_session_user()
+                    st.session_state.current_page = "Dashboard"
+                    st.rerun()
+        else:
+            if st.session_state.current_page == "Sign In":
+                st.markdown(
+                    '<div style="text-align: right;"><span class="step-pill" style="margin-right: 0;">Sign In</span></div>',
+                    unsafe_allow_html=True
+                )
+            else:
+                if st.button("Sign In / Join", key="header_sign_in_btn", use_container_width=True, type="secondary"):
+                    st.session_state.current_page = "Sign In"
+                    st.rerun()
+
     st.markdown("<hr style='margin: 8px 0 20px 0; border: none; border-top: 1px solid #F0E2DA;'>", unsafe_allow_html=True)
+
+
+# =============================================================================
+# VIEW 0: AUTHENTICATION (SIGN IN & REGISTER)
+# =============================================================================
+def render_auth_view():
+    """Render the Sign In and Account Registration view with secure validation and isolation."""
+    st.markdown('<div class="badge-pill">Secure Access &bull; Multi-User Identity</div>', unsafe_allow_html=True)
+    st.markdown("<h1>Personalized Health Account</h1>", unsafe_allow_html=True)
+    st.markdown(
+        "Sign in or register to securely persist your baseline lifestyle profiles, "
+        "track your sequential cycle records, and maintain private, isolated health history across sessions."
+    )
+
+    auth_card_col, side_info_col = st.columns([1.1, 1.0], gap="large")
+
+    with auth_card_col:
+        tab_login, tab_register = st.tabs(["Sign In", "Create Account"])
+
+        with tab_login:
+            st.markdown('<div style="font-size: 0.90rem; font-weight: 600; color: #59433F; margin-bottom: 12px; margin-top: 6px;">Sign in to your account</div>', unsafe_allow_html=True)
+            with st.form("form_login"):
+                login_identifier = st.text_input("Username or Email", placeholder="e.g. sanjana or sanjana@example.com", key="login_id_input")
+                login_password = st.text_input("Password", type="password", key="login_pw_input")
+                btn_login_submit = st.form_submit_button("Sign In", use_container_width=True, type="primary")
+
+                if btn_login_submit:
+                    if not login_identifier.strip() or not login_password:
+                        st.error("Please enter both your username/email and password.")
+                    else:
+                        try:
+                            user = authenticate(login_identifier.strip(), login_password)
+                            login_session_user(user)
+                            st.session_state.current_page = "Dashboard"
+                            st.rerun()
+                        except AuthenticationError as e:
+                            st.error(str(e))
+                        except Exception as e:
+                            st.error(f"Sign-in error: {e}")
+
+        with tab_register:
+            st.markdown('<div style="font-size: 0.90rem; font-weight: 600; color: #59433F; margin-bottom: 12px; margin-top: 6px;">Register a new personal account</div>', unsafe_allow_html=True)
+            with st.form("form_register"):
+                reg_username = st.text_input("Username (3–30 characters)", placeholder="e.g. maya_chen", key="reg_user_input")
+                reg_email = st.text_input("Email Address", placeholder="e.g. maya@example.com", key="reg_email_input")
+                reg_fullname = st.text_input("Full Name (Optional)", placeholder="e.g. Maya Chen", key="reg_name_input")
+                reg_password = st.text_input("Password (min 8 characters, letters & numbers)", type="password", key="reg_pw_input")
+                reg_confirm = st.text_input("Confirm Password", type="password", key="reg_confirm_input")
+                btn_reg_submit = st.form_submit_button("Create Account", use_container_width=True, type="primary")
+
+                if btn_reg_submit:
+                    try:
+                        user = register_user(
+                            username=reg_username,
+                            email=reg_email,
+                            password=reg_password,
+                            confirm_password=reg_confirm,
+                            full_name=reg_fullname.strip() if reg_fullname.strip() else None
+                        )
+                        login_session_user(user)
+                        st.session_state.current_page = "Dashboard"
+                        st.rerun()
+                    except (DBValidationError, UserAlreadyExistsError) as e:
+                        st.error(str(e))
+                    except Exception as e:
+                        st.error(f"Registration error: {e}")
+
+        st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+        if st.button("Continue as Guest (No Account Required)", key="btn_guest_continue", use_container_width=True, type="secondary"):
+            st.session_state.current_page = "Dashboard"
+            st.rerun()
+
+    with side_info_col:
+        st.markdown("""
+        <div class="card-surface">
+            <div class="card-header-serif">Privacy &amp; Data Isolation Principles</div>
+            <p style="font-size: 0.88rem; line-height: 1.55; color: #59433F;">
+                <b>Strict Personal Isolation:</b> Every user account is assigned an unguessable prefixed identifier (<code>usr_*</code>). 
+                All baseline lifestyle profiles and cycle prediction history are mapped exclusively to this ID with foreign-key constraints.
+            </p>
+            <p style="font-size: 0.88rem; line-height: 1.55; color: #59433F;">
+                <b>Zero Stranger-Data Substitution:</b> In HERAI, cycle predictions for Cycle 1 utilize published cohort reference medians. 
+                Your personal observations are never shared with or borrowed by any other user.
+            </p>
+            <p style="font-size: 0.88rem; line-height: 1.55; color: #59433F;">
+                <b>Bcrypt Cryptography:</b> Passwords are never stored in plaintext. They are salted with 12 adaptive hashing rounds and verified using timing-safe comparisons.
+            </p>
+            <p style="font-size: 0.88rem; line-height: 1.55; color: #59433F;">
+                <b>Local Persistent Storage:</b> Account records are stored in a local SQLite database secured with parameterized queries to prevent SQL injection vulnerabilities.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
 
 
 # =============================================================================
@@ -783,6 +924,11 @@ def render_health_prediction(predictor: HerAIPredictor):
         """, unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
+    # User authentication context and persistent profile lookup
+    user_id = get_current_user_id()
+    saved_profile = get_user_profile(user_id) if user_id else None
+    user_history = get_user_cycle_logs(user_id, limit=10) if user_id else []
+
     # Default mapping
     if preset == "Balanced & Regular Cycle (Optimal Range)":
         def_age, def_bmi, def_diet, def_exercise = 28, 22.2, "Good", "3–4 days/week"
@@ -791,6 +937,8 @@ def render_health_prediction(predictor: HerAIPredictor):
         def_mood, def_stress, def_sleep = 8, 3.0, 8.0
         def_energy, def_focus, def_lost = 8, 8, 0.0
         def_bc, def_pcos = 0, 0
+        def_caffeine, def_water = 1.5, 2.0
+        def_smoke, def_alcohol, def_state = "Non-smoker", "None", "California"
     elif preset == "High Stress & Moderate Fatigue":
         def_age, def_bmi, def_diet, def_exercise = 31, 24.0, "Fair", "1–2 days/week"
         def_bsleep, def_bstress = 6.5, 7.5
@@ -798,6 +946,8 @@ def render_health_prediction(predictor: HerAIPredictor):
         def_mood, def_stress, def_sleep = 5, 8.0, 5.5
         def_energy, def_focus, def_lost = 4, 5, 4.0
         def_bc, def_pcos = 0, 0
+        def_caffeine, def_water = 2.5, 1.5
+        def_smoke, def_alcohol, def_state = "Non-smoker", "Occasional", "New York"
     elif preset == "Elevated Cramping & Dysmenorrhea":
         def_age, def_bmi, def_diet, def_exercise = 26, 21.5, "Good", "1–2 days/week"
         def_bsleep, def_bstress = 7.0, 5.0
@@ -805,6 +955,8 @@ def render_health_prediction(predictor: HerAIPredictor):
         def_mood, def_stress, def_sleep = 4, 6.0, 6.0
         def_energy, def_focus, def_lost = 4, 4, 6.0
         def_bc, def_pcos = 0, 0
+        def_caffeine, def_water = 1.0, 2.5
+        def_smoke, def_alcohol, def_state = "Non-smoker", "None", "Texas"
     elif preset == "Longer Cycle with Mild Symptoms":
         def_age, def_bmi, def_diet, def_exercise = 29, 26.5, "Fair", "3–4 days/week"
         def_bsleep, def_bstress = 7.5, 5.5
@@ -812,13 +964,34 @@ def render_health_prediction(predictor: HerAIPredictor):
         def_mood, def_stress, def_sleep = 6, 5.0, 7.5
         def_energy, def_focus, def_lost = 6, 6, 0.0
         def_bc, def_pcos = 0, 1
+        def_caffeine, def_water = 2.0, 2.0
+        def_smoke, def_alcohol, def_state = "Former", "Occasional", "Illinois"
     else:
-        def_age, def_bmi, def_diet, def_exercise = 28, 22.5, "Good", "3–4 days/week"
-        def_bsleep, def_bstress = 7.5, 4.0
+        # Custom Inputs: Pre-fill baseline if user has a saved profile in the database
+        if saved_profile:
+            def_age = int(saved_profile.age) if saved_profile.age is not None else 28
+            def_bmi = float(saved_profile.bmi) if saved_profile.bmi is not None else 22.5
+            def_diet = saved_profile.diet_quality if saved_profile.diet_quality else "Good"
+            def_exercise = saved_profile.exercise_frequency if saved_profile.exercise_frequency else "3–4 days/week"
+            def_bsleep = float(saved_profile.sleep_hours) if saved_profile.sleep_hours is not None else 7.5
+            def_bstress = float(saved_profile.stress_score_baseline) if saved_profile.stress_score_baseline is not None else 4.0
+            def_bc = int(saved_profile.birth_control_use) if saved_profile.birth_control_use is not None else 0
+            def_pcos = int(saved_profile.pcos_diagnosed) if saved_profile.pcos_diagnosed is not None else 0
+            def_caffeine = float(saved_profile.caffeine_intake) if saved_profile.caffeine_intake is not None else 1.5
+            def_water = float(saved_profile.water_intake_liters) if saved_profile.water_intake_liters is not None else 2.0
+            def_smoke = saved_profile.smoking_status if saved_profile.smoking_status else "Non-smoker"
+            def_alcohol = saved_profile.alcohol_consumption if saved_profile.alcohol_consumption else "None"
+            def_state = saved_profile.state if saved_profile.state else "California"
+        else:
+            def_age, def_bmi, def_diet, def_exercise = 28, 22.5, "Good", "3–4 days/week"
+            def_bsleep, def_bstress = 7.5, 4.0
+            def_bc, def_pcos = 0, 0
+            def_caffeine, def_water = 1.5, 2.0
+            def_smoke, def_alcohol, def_state = "Non-smoker", "None", "California"
+
         def_clen, def_phase, def_flow, def_pain = 28, "Menstrual", "Medium", 3
         def_mood, def_stress, def_sleep = 7, 4.0, 7.5
         def_energy, def_focus, def_lost = 7, 7, 0.0
-        def_bc, def_pcos = 0, 0
 
     col1, col2, col3 = st.columns([1, 1, 1], gap="medium")
 
@@ -861,17 +1034,55 @@ def render_health_prediction(predictor: HerAIPredictor):
             st.caption("Non-diagnostic observational inputs used in the Ridge regression model.")
             pcos_obs = st.checkbox("Self-Reported History of PCOS", value=bool(def_pcos))
             bc_obs = st.checkbox("Hormonal Contraceptive Use", value=bool(def_bc))
-            caffeine_intake = st.slider("Caffeine Intake (cups/day)", 0.0, 6.0, 1.5, step=0.5)
-            water_intake = st.slider("Water Intake (Liters/day)", 0.5, 5.0, 2.0, step=0.5)
-            smoking_stat = st.selectbox("Smoking Status", ["Non-smoker", "Former", "Smoker"], index=0)
-            alcohol_stat = st.selectbox("Alcohol Consumption", ["None", "Occasional", "Moderate", "Frequent"], index=0)
-            state_region = st.selectbox("State / Region", ["California", "New York", "Texas", "Florida", "Illinois", "Other"], index=0)
+            caffeine_intake = st.slider("Caffeine Intake (cups/day)", 0.0, 6.0, float(def_caffeine), step=0.5)
+            water_intake = st.slider("Water Intake (Liters/day)", 0.5, 5.0, float(def_water), step=0.5)
+            smoke_opts = ["Non-smoker", "Former", "Smoker"]
+            smoke_idx = smoke_opts.index(def_smoke) if def_smoke in smoke_opts else 0
+            smoking_stat = st.selectbox("Smoking Status", smoke_opts, index=smoke_idx)
+            alc_opts = ["None", "Occasional", "Moderate", "Frequent"]
+            alc_idx = alc_opts.index(def_alcohol) if def_alcohol in alc_opts else 0
+            alcohol_stat = st.selectbox("Alcohol Consumption", alc_opts, index=alc_idx)
+            state_opts = ["California", "New York", "Texas", "Florida", "Illinois", "Other"]
+            state_idx = state_opts.index(def_state) if def_state in state_opts else 0
+            state_region = st.selectbox("State / Region", state_opts, index=state_idx)
+
+        if user_id:
+            st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+            if st.button("Save Baseline to Profile", key="btn_save_user_profile", use_container_width=True, type="secondary"):
+                save_user_profile(
+                    user_id=user_id,
+                    profile_data={
+                        "age": age,
+                        "bmi": bmi,
+                        "diet_quality": diet_quality,
+                        "exercise_frequency": exercise_freq,
+                        "sleep_hours": base_sleep,
+                        "stress_score_baseline": base_stress,
+                        "pcos_diagnosed": 1 if pcos_obs else 0,
+                        "birth_control_use": 1 if bc_obs else 0,
+                        "caffeine_intake": caffeine_intake,
+                        "water_intake_liters": water_intake,
+                        "smoking_status": smoking_stat,
+                        "alcohol_consumption": alcohol_stat,
+                        "state": state_region,
+                    }
+                )
+                st.success("Lifestyle baseline saved to your private profile.")
 
         st.markdown('</div>', unsafe_allow_html=True)
 
     # Section 3: Previous-Cycle Information
     with col3:
         st.markdown('<div class="card-surface"><div class="card-header-serif"><span class="step-pill">Step 3</span> Historical Records</div>', unsafe_allow_html=True)
+        if user_id and user_history:
+            st.markdown(
+                f'<div style="margin-bottom: 8px;">'
+                f'<span class="badge-pill" style="background: rgba(110, 139, 98, 0.15); color: #2D5028;">'
+                f'{len(user_history)} Cycles Saved in Account</span>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+
         hist_mode = st.radio(
             "History Availability:",
             [
@@ -900,14 +1111,41 @@ def render_health_prediction(predictor: HerAIPredictor):
                 Enter your observations from your preceding cycle.
             </div>
             """, unsafe_allow_html=True)
-            prev_health = st.slider("Previous Cycle Overall Health (0–10)", 2.0, 10.0, 8.0, step=0.2)
-            prev_len = st.slider("Previous Cycle Length (Days)", 20, 42, 28)
-            prev_pain = st.slider("Previous Cycle Pain (0–10)", 0, 10, 3)
-            prev_stress = st.slider("Previous Cycle Stress (0–10)", 0.0, 10.0, 4.0, step=0.5)
-            prev_sleep = st.slider("Previous Cycle Sleep (Hours)", 4.0, 11.0, 7.5, step=0.5)
-            prev_energy = st.slider("Previous Cycle Vitality (0–10)", 0, 10, 7)
-            prev_mood = st.slider("Previous Cycle Mood (0–10)", 0, 10, 7)
-            prev_focus = st.slider("Previous Cycle Concentration (0–10)", 0, 10, 7)
+
+            hist_health_def = 8.0
+            hist_len_def = 28
+            hist_pain_def = 3
+            hist_stress_def = 4.0
+            hist_sleep_def = 7.5
+            hist_energy_def = 7
+            hist_mood_def = 7
+            hist_focus_def = 7
+
+            if user_id and user_history:
+                latest_cycle = user_history[0]
+                prefill_latest = st.checkbox(
+                    f"Load from previous logged Cycle #{latest_cycle.cycle_number}",
+                    value=False,
+                    key="chk_prefill_cycle"
+                )
+                if prefill_latest:
+                    hist_health_def = float(latest_cycle.predicted_health_score or 8.0)
+                    hist_len_def = int(latest_cycle.cycle_length_days or 28)
+                    hist_pain_def = int(latest_cycle.pain_level or 3)
+                    hist_stress_def = float(latest_cycle.stress_score_cycle or 4.0)
+                    hist_sleep_def = float(latest_cycle.sleep_hours_cycle or 7.5)
+                    hist_energy_def = int(latest_cycle.energy_level or 7)
+                    hist_mood_def = int(latest_cycle.mood_score or 7)
+                    hist_focus_def = int(latest_cycle.concentration_score or 7)
+
+            prev_health = st.slider("Previous Cycle Overall Health (0–10)", 2.0, 10.0, hist_health_def, step=0.2)
+            prev_len = st.slider("Previous Cycle Length (Days)", 20, 42, hist_len_def)
+            prev_pain = st.slider("Previous Cycle Pain (0–10)", 0, 10, hist_pain_def)
+            prev_stress = st.slider("Previous Cycle Stress (0–10)", 0.0, 10.0, hist_stress_def, step=0.5)
+            prev_sleep = st.slider("Previous Cycle Sleep (Hours)", 4.0, 11.0, hist_sleep_def, step=0.5)
+            prev_energy = st.slider("Previous Cycle Vitality (0–10)", 0, 10, hist_energy_def)
+            prev_mood = st.slider("Previous Cycle Mood (0–10)", 0, 10, hist_mood_def)
+            prev_focus = st.slider("Previous Cycle Concentration (0–10)", 0, 10, hist_focus_def)
 
             hist_input = HistoricalCycleInput(
                 previous_health_score=prev_health,
@@ -1158,6 +1396,68 @@ def render_prediction_results(result, inputs: Optional[Dict[str, Any]]):
         </span>
     </div>
     """, unsafe_allow_html=True)
+
+    # Multi-User Account Persistence: Save cycle record & history inspection
+    user_id = get_current_user_id()
+    if user_id:
+        st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
+        col_act1, col_act2 = st.columns([1.6, 2.4], vertical_alignment="center")
+        with col_act1:
+            if st.button("Save Cycle Record to My Account", key="btn_save_cycle_record", type="primary", use_container_width=True):
+                cycle_num = get_next_cycle_number(user_id)
+                cycle_data = {
+                    "cycle_number": cycle_num,
+                    "cycle_length_days": inputs.get("cycle_length", 28) if inputs else 28,
+                    "cycle_phase": inputs.get("phase", "Menstrual") if inputs else "Menstrual",
+                    "flow_level": inputs.get("flow", "Medium") if inputs else "Medium",
+                    "pain_level": inputs.get("pain", 0) if inputs else 0,
+                    "mood_score": inputs.get("mood", 7) if inputs else 7,
+                    "stress_score_cycle": inputs.get("cycle_stress", 4.0) if inputs else 4.0,
+                    "sleep_hours_cycle": inputs.get("cycle_sleep", 7.5) if inputs else 7.5,
+                    "energy_level": inputs.get("energy", 7) if inputs else 7,
+                    "concentration_score": inputs.get("focus", 7) if inputs else 7,
+                    "work_hours_lost": inputs.get("hours_lost", 0.0) if inputs else 0.0,
+                }
+                save_user_cycle_log(
+                    user_id=user_id,
+                    cycle_data=cycle_data,
+                    predicted_score=score_val,
+                    prediction_tier=result.prediction_tier,
+                )
+                st.success(f"Cycle #{cycle_num} saved successfully to your private account history.")
+                st.rerun()
+        with col_act2:
+            st.caption("Your saved cycle records are strictly isolated to your user account and persist in your local encrypted/secured database.")
+
+        saved_logs = get_user_cycle_logs(user_id, limit=10)
+        if saved_logs:
+            st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+            with st.expander(f"View Your Logged Cycle History ({len(saved_logs)} cycles saved)", expanded=False):
+                hist_records = []
+                for entry in saved_logs:
+                    hist_records.append({
+                        "Cycle #": entry.cycle_number,
+                        "Length (Days)": entry.cycle_length_days,
+                        "Phase": entry.cycle_phase,
+                        "Flow": entry.flow_level,
+                        "Pain (0-10)": entry.pain_level,
+                        "Stress (0-10)": entry.stress_score_cycle,
+                        "Sleep (Hrs)": entry.sleep_hours_cycle,
+                        "Predicted Health": f"{entry.predicted_health_score:.2f}" if entry.predicted_health_score is not None else "N/A",
+                        "Tier": entry.prediction_tier or "Standard",
+                        "Logged At": entry.created_at[:16] if entry.created_at else "",
+                    })
+                st.dataframe(pd.DataFrame(hist_records), use_container_width=True, hide_index=True)
+    else:
+        st.markdown("""
+        <div style="background: #FAF5F2; border: 1px dashed #D99AA5; border-radius: 8px; padding: 14px 18px; margin: 18px 0; font-size: 0.86rem; color: #59433F;">
+            <b>Personalized History &amp; Privacy:</b> You are currently exploring HERAI as a guest. 
+            Sign in or create an account to save your sequential cycle records, auto-fill baseline lifestyle inputs, and preserve your personal health patterns securely across sessions.
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Sign In / Join to Save Records", key="btn_guest_prompt_auth", type="secondary"):
+            st.session_state.current_page = "Sign In"
+            st.rerun()
 
 
 # =============================================================================
@@ -1653,7 +1953,9 @@ def main():
     predictor = get_predictor()
     cohort_df = get_cohort_dataset()
 
-    if st.session_state.current_page == "Dashboard":
+    if st.session_state.current_page == "Sign In":
+        render_auth_view()
+    elif st.session_state.current_page == "Dashboard":
         render_dashboard(cohort_df)
     elif st.session_state.current_page == "Health Prediction":
         render_health_prediction(predictor)

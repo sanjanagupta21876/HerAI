@@ -21,6 +21,13 @@ htmlcov/
 .env.*
 .streamlit/secrets.toml
 
+# SQLite Database & Journal Files
+*.db
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+
 # OS artifacts
 .DS_Store
 Thumbs.db
