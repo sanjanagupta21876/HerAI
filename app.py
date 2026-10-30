@@ -669,7 +669,8 @@ def render_auth_view():
         tab_login, tab_register = st.tabs(["Sign In", "Create Account"])
 
         with tab_login:
-            st.markdown('<div style="font-size: 0.90rem; font-weight: 600; color: #59433F; margin-bottom: 12px; margin-top: 6px;">Sign in to your account</div>', unsafe_allow_html=True)
+            st.markdown('<div style="font-size: 0.90rem; font-weight: 600; color: #59433F; margin-bottom: 4px; margin-top: 6px;">Sign in to your account</div>', unsafe_allow_html=True)
+            st.markdown('<div style="font-size: 0.82rem; color: #7A6560; margin-bottom: 12px;">First time here? Switch to the <b>Create Account</b> tab above to register.</div>', unsafe_allow_html=True)
             with st.form("form_login"):
                 login_identifier = st.text_input("Username or Email", placeholder="e.g. sanjana or sanjana@example.com", key="login_id_input")
                 login_password = st.text_input("Password", type="password", key="login_pw_input")
@@ -690,7 +691,7 @@ def render_auth_view():
                                 st.session_state.onboarding_step = 1
                             st.rerun()
                         except AuthenticationError as e:
-                            st.error(str(e))
+                            st.error(f"{e} If you haven't created an account yet, switch to the 'Create Account' tab above to register.")
                         except Exception as e:
                             st.error(f"Sign-in error: {e}")
 
