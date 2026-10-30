@@ -19,6 +19,7 @@ htmlcov/
 # Environment secrets & config
 .env
 .env.*
+!.env.example
 .streamlit/secrets.toml
 
 # SQLite Database & Journal Files

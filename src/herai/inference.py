@@ -121,6 +121,11 @@ class PredictionOutput:
         "treatment, or clinical decision-making."
     )
 
+    @property
+    def prediction_tier(self) -> str:
+        """Alias property matching score_category for UI tier badges."""
+        return self.score_category
+
 
 class HerAIPredictor:
     """Inference engine using strictly user-owned records and trained pipelines."""

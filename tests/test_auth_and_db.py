@@ -883,3 +883,165 @@ def test_phase3_personal_visualizations_render_safely():
     fig_bio_populated = create_personal_biomarker_trend_chart(logs)
     assert len(fig_bio_populated.data) == 3  # Sleep + Stress + Pain
 
+
+# =============================================================================
+# PHASE 4: END-TO-END DEMO READINESS & LIFECYCLE INTEGRATION
+# =============================================================================
+def test_phase4_end_to_end_user_journey(temp_db):
+    """End-to-end integration test verifying the complete user lifecycle for demonstration readiness:
+    
+    1. Registration & duplicate rejection
+    2. Password verification & authentication
+    3. Onboarding completion & profile persistence
+    4. ML prediction inference with user-owned data
+    5. Cycle log persistence scoped to user_id
+    6. Dashboard stats & physiological phase estimation
+    7. Multi-user isolation against cross-account leaks
+    8. Account deletion cascade
+    """
+    from datetime import date, timedelta
+    from herai.database import (
+        get_user_dashboard_stats,
+        has_completed_onboarding,
+        delete_user,
+    )
+    from herai.inference import (
+        HerAIPredictor,
+        UserProfileInput,
+        CurrentCycleInput,
+    )
+
+    # 1. Registration
+    user = register_user(
+        username="sarah_demo",
+        email="sarah.demo@example.com",
+        password="SecurePassword123",
+        confirm_password="SecurePassword123",
+        db_path=temp_db
+    )
+    assert user.id.startswith("usr_")
+
+    # Duplicate registration rejected
+    with pytest.raises(UserAlreadyExistsError):
+        register_user("sarah_demo", "diff@example.com", "SecurePassword123", "SecurePassword123", db_path=temp_db)
+
+    # 2. Authentication with valid & invalid credentials
+    auth_user = authenticate("sarah_demo", "SecurePassword123", db_path=temp_db)
+    assert auth_user.id == user.id
+
+    with pytest.raises(AuthenticationError):
+        authenticate("sarah_demo", "WrongPassword999", db_path=temp_db)
+
+    # Initial state: onboarding not completed
+    assert has_completed_onboarding(user.id, db_path=temp_db) is False
+
+    # 3. Onboarding & Profile Persistence
+    ten_days_ago = (date.today() - timedelta(days=10)).strftime("%Y-%m-%d")
+    save_user_profile(
+        user.id,
+        {
+            "preferred_name": "Sarah",
+            "age": 27.0,
+            "typical_cycle_length": 28,
+            "typical_period_duration": 5,
+            "cycle_regularity": "Regular",
+            "last_period_date": ten_days_ago,
+            "wellness_interests": ["Sleep optimization", "Cycle tracking"],
+            "sleep_hours": 8.0,
+            "water_intake_liters": 2.2,
+            "exercise_frequency": "3–4 days/week",
+            "stress_score_baseline": 3.0,
+            "onboarding_completed": True,
+        },
+        db_path=temp_db
+    )
+    assert has_completed_onboarding(user.id, db_path=temp_db) is True
+    profile = get_user_profile(user.id, db_path=temp_db)
+    assert profile.preferred_name == "Sarah"
+    assert profile.typical_cycle_length == 28
+
+    # 4. ML Prediction with user-owned data
+    predictor = HerAIPredictor()
+    prof_input = UserProfileInput(
+        age=profile.age,
+        bmi=22.4,
+        sleep_hours=profile.sleep_hours,
+        stress_score_baseline=profile.stress_score_baseline,
+        state="California",
+        diet_quality="Good",
+        exercise_frequency=profile.exercise_frequency,
+        caffeine_intake=1.5,
+        water_intake_liters=profile.water_intake_liters,
+        alcohol_consumption="None",
+        smoking_status="Non-smoker",
+        birth_control_use=0,
+        pcos_diagnosed=0,
+    )
+    cycle_input = CurrentCycleInput(
+        cycle_length_days=float(profile.typical_cycle_length),
+        pain_level=2.0,
+        mood_score=8.0,
+        stress_score_cycle=3.0,
+        sleep_hours_cycle=8.0,
+        energy_level=8.0,
+        concentration_score=8.0,
+        work_hours_lost=0.0,
+        cycle_phase="Follicular",
+        flow_level="Medium",
+    )
+    prediction = predictor.predict(prof_input, cycle_input)
+    assert 1.0 <= prediction.predicted_next_health_score <= 10.0
+    assert prediction.score_category in ("Optimal", "Moderate", "Sub-optimal")
+    assert prediction.prediction_tier == prediction.score_category
+
+    # 5. Save Cycle Log
+    log_id = save_user_cycle_log(
+        user_id=user.id,
+        cycle_data={
+            "cycle_number": 1,
+            "cycle_length_days": 28.0,
+            "cycle_phase": "Follicular",
+            "flow_level": "Medium",
+            "pain_level": 2.0,
+            "mood_score": 8.0,
+            "stress_score_cycle": 3.0,
+            "sleep_hours_cycle": 8.0,
+            "energy_level": 8.0,
+            "concentration_score": 8.0,
+            "work_hours_lost": 0.0,
+        },
+        predicted_score=prediction.predicted_next_health_score,
+        prediction_tier=prediction.prediction_tier,
+        db_path=temp_db
+    )
+    assert log_id.startswith("log_")
+
+    # 6. Dashboard Stats & Dynamic Phase Estimation
+    stats = get_user_dashboard_stats(user.id, db_path=temp_db)
+    assert stats["total_cycles"] == 1
+    assert stats["latest_cycle"].cycle_number == 1
+    assert stats["latest_health_score"] == prediction.predicted_next_health_score
+    assert stats["latest_health_tier"] == prediction.prediction_tier
+    assert stats["estimated_cycle_day"] == 11
+    assert stats["estimated_phase"] == "Follicular"
+
+    # 7. Multi-User Isolation
+    other_user = register_user(
+        username="elena_demo",
+        email="elena.demo@example.com",
+        password="SecurePassword456",
+        confirm_password="SecurePassword456",
+        db_path=temp_db
+    )
+    other_stats = get_user_dashboard_stats(other_user.id, db_path=temp_db)
+    assert other_stats["total_cycles"] == 0
+    assert other_stats["latest_cycle"] is None
+    assert other_stats["latest_health_score"] is None
+    assert other_stats["profile"] is None
+
+    # 8. Account Deletion Cascade
+    delete_user(user.id, db_path=temp_db)
+    assert get_user_profile(user.id, db_path=temp_db) is None
+    assert len(get_user_cycle_logs(user.id, db_path=temp_db)) == 0
+
+

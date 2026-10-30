@@ -2510,7 +2510,7 @@ def render_prediction_results(result, inputs: Optional[Dict[str, Any]]):
                     user_id=user_id,
                     cycle_data=cycle_data,
                     predicted_score=score_val,
-                    prediction_tier=result.prediction_tier,
+                    prediction_tier=getattr(result, "prediction_tier", getattr(result, "score_category", "Standard")),
                 )
                 st.success(f"Cycle #{cycle_num} saved successfully to your private account history.")
                 st.rerun()

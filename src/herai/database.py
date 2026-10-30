@@ -449,6 +449,9 @@ def delete_user_account(user_id: str, db_path: Optional[Path] = None) -> bool:
         return cursor.rowcount > 0
 
 
+delete_user = delete_user_account
+
+
 # =============================================================================
 # USER PROFILE VALIDATION & STORAGE (STRICT USER_ID ISOLATION)
 # =============================================================================
