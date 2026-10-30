@@ -673,3 +673,213 @@ def test_phase2_missing_optional_profile_fields_permitted(temp_db):
     assert prof.last_period_date is None
     assert prof.typical_cycle_length is None
     assert prof.wellness_interests == []
+
+
+# =============================================================================
+# PHASE 3: DASHBOARD STATS, PERSONAL METRICS & DATA ISOLATION
+# =============================================================================
+def test_phase3_dashboard_stats_new_user_empty_state(temp_db):
+    """Verify Phase 3: New user without cycle logs receives empty state metrics without fabricated data."""
+    from herai.database import get_user_dashboard_stats
+
+    user = register_user("brand_new_user", "new@example.com", "SecurePass123", "SecurePass123", db_path=temp_db)
+    save_user_profile(
+        user.id,
+        {
+            "preferred_name": "Clara",
+            "typical_cycle_length": 28,
+            "typical_period_duration": 5,
+            "cycle_regularity": "Regular",
+            "sleep_hours": 8.0,
+            "stress_score_baseline": 3.0,
+            "wellness_interests": ["Sleep optimization"],
+            "onboarding_completed": True,
+        },
+        db_path=temp_db
+    )
+
+    stats = get_user_dashboard_stats(user.id, db_path=temp_db)
+    assert stats["total_cycles"] == 0
+    assert stats["latest_cycle"] is None
+    assert stats["latest_health_score"] is None
+    assert stats["latest_health_tier"] is None
+    assert stats["avg_cycle_length"] == 28.0
+    assert stats["avg_sleep"] == 8.0
+    assert stats["avg_stress"] == 3.0
+    assert stats["profile"].preferred_name == "Clara"
+
+
+def test_phase3_dashboard_stats_returning_user_with_cycles(temp_db):
+    """Verify Phase 3: Returning user with multiple cycles computes correct personal aggregations."""
+    from herai.database import get_user_dashboard_stats
+
+    user = register_user("returning_user", "returning@example.com", "SecurePass123", "SecurePass123", db_path=temp_db)
+    save_user_profile(
+        user.id,
+        {
+            "preferred_name": "Elena",
+            "typical_cycle_length": 28,
+            "onboarding_completed": True,
+        },
+        db_path=temp_db
+    )
+
+    # Save Cycle 1
+    save_user_cycle_log(
+        user.id,
+        log_data={
+            "cycle_number": 1,
+            "cycle_length_days": 28.0,
+            "cycle_phase": "Menstrual",
+            "flow_level": "Medium",
+            "pain_level": 3.0,
+            "sleep_hours_cycle": 7.5,
+            "stress_score_cycle": 4.0,
+            "predicted_next_health_score": 8.65,
+            "score_category": "Optimal",
+        },
+        db_path=temp_db
+    )
+
+    # Save Cycle 2
+    save_user_cycle_log(
+        user.id,
+        log_data={
+            "cycle_number": 2,
+            "cycle_length_days": 30.0,
+            "cycle_phase": "Follicular",
+            "flow_level": "Light",
+            "pain_level": 1.0,
+            "sleep_hours_cycle": 8.5,
+            "stress_score_cycle": 2.0,
+            "predicted_next_health_score": 9.10,
+            "score_category": "Optimal",
+        },
+        db_path=temp_db
+    )
+
+    stats = get_user_dashboard_stats(user.id, db_path=temp_db)
+    assert stats["total_cycles"] == 2
+    assert stats["avg_cycle_length"] == 29.0
+    assert stats["latest_cycle"].cycle_number == 2
+    assert stats["latest_health_score"] == 9.10
+    assert stats["latest_health_tier"] == "Optimal"
+    assert stats["avg_sleep"] == 8.0
+    assert stats["avg_stress"] == 3.0
+    assert stats["avg_pain"] == 2.0
+
+
+def test_phase3_dashboard_stats_isolation_between_users(temp_db):
+    """Verify Phase 3: Strict user isolation prevents cross-account leak of cycle logs and metrics."""
+    from herai.database import get_user_dashboard_stats
+
+    user_a = register_user("user_alpha", "alpha@example.com", "Password123", "Password123", db_path=temp_db)
+    user_b = register_user("user_beta", "beta@example.com", "Password123", "Password123", db_path=temp_db)
+
+    # User A logs cycles
+    save_user_cycle_log(
+        user_a.id,
+        log_data={
+            "cycle_number": 1,
+            "cycle_length_days": 27.0,
+            "predicted_next_health_score": 8.80,
+            "score_category": "Optimal",
+        },
+        db_path=temp_db
+    )
+    save_user_cycle_log(
+        user_a.id,
+        log_data={
+            "cycle_number": 2,
+            "cycle_length_days": 29.0,
+            "predicted_next_health_score": 8.95,
+            "score_category": "Optimal",
+        },
+        db_path=temp_db
+    )
+
+    stats_a = get_user_dashboard_stats(user_a.id, db_path=temp_db)
+    stats_b = get_user_dashboard_stats(user_b.id, db_path=temp_db)
+
+    # User A has 2 cycles
+    assert stats_a["total_cycles"] == 2
+    assert stats_a["latest_health_score"] == 8.95
+
+    # User B has 0 cycles, completely isolated
+    assert stats_b["total_cycles"] == 0
+    assert stats_b["latest_health_score"] is None
+    assert stats_b["latest_cycle"] is None
+
+
+def test_phase3_user_cycle_log_record_duality(temp_db):
+    """Verify Phase 3: UserCycleLogRecord implements dual attribute and dictionary access."""
+    from herai.database import UserCycleLogRecord
+
+    record = UserCycleLogRecord(
+        id="log_test1",
+        user_id="usr_test1",
+        cycle_number=3,
+        cycle_length_days=28.5,
+        predicted_next_health_score=8.75,
+        score_category="Optimal",
+    )
+
+    # Attribute access
+    assert record.cycle_number == 3
+    assert record.cycle_length_days == 28.5
+    assert record.predicted_next_health_score == 8.75
+    assert record.predicted_health_score == 8.75  # Alias property
+    assert record.prediction_tier == "Optimal"      # Alias property
+
+    # Dictionary access
+    assert record["cycle_number"] == 3
+    assert record["cycle_length_days"] == 28.5
+    assert record["predicted_next_health_score"] == 8.75
+    assert record["predicted_health_score"] == 8.75
+    assert record["prediction_tier"] == "Optimal"
+
+    # Dictionary helper methods
+    assert record.get("cycle_number") == 3
+    assert record.get("non_existent", "fallback") == "fallback"
+    assert "cycle_number" in record
+    assert "predicted_health_score" in record
+    assert isinstance(record.to_dict(), dict)
+
+
+def test_phase3_personal_visualizations_render_safely():
+    """Verify Phase 3: Personal trajectory and biomarker trend charts generate valid Plotly figures."""
+    from herai.visualizations import (
+        create_personal_health_trajectory_chart,
+        create_personal_biomarker_trend_chart,
+    )
+    from herai.database import UserCycleLogRecord
+
+    # 1. Empty logs
+    fig_empty = create_personal_health_trajectory_chart([])
+    assert fig_empty is not None
+    assert hasattr(fig_empty, "to_plotly_json")
+
+    fig_bio_empty = create_personal_biomarker_trend_chart([])
+    assert fig_bio_empty is not None
+    assert hasattr(fig_bio_empty, "to_plotly_json")
+
+    # 2. Populated logs
+    logs = [
+        UserCycleLogRecord(
+            id="log1", user_id="u1", cycle_number=1, cycle_length_days=28.0,
+            cycle_phase="Menstrual", pain_level=3.0, sleep_hours_cycle=7.5,
+            stress_score_cycle=4.0, predicted_next_health_score=8.50, score_category="Optimal"
+        ),
+        UserCycleLogRecord(
+            id="log2", user_id="u1", cycle_number=2, cycle_length_days=29.0,
+            cycle_phase="Follicular", pain_level=1.0, sleep_hours_cycle=8.0,
+            stress_score_cycle=3.0, predicted_next_health_score=8.85, score_category="Optimal"
+        ),
+    ]
+
+    fig_populated = create_personal_health_trajectory_chart(logs, user_name="Maya's")
+    assert len(fig_populated.data) >= 2  # Cohort mean + user trajectory
+
+    fig_bio_populated = create_personal_biomarker_trend_chart(logs)
+    assert len(fig_bio_populated.data) == 3  # Sleep + Stress + Pain
+

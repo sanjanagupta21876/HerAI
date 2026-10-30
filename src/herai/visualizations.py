@@ -374,6 +374,214 @@ def create_user_trajectory_chart(period_df: pd.DataFrame, user_id: str) -> go.Fi
     return fig
 
 
+def create_personal_health_trajectory_chart(user_logs: List[Any], user_name: str = "Personal") -> go.Figure:
+    """Plot authenticated user's longitudinal health forecast scores over logged cycles."""
+    fig = go.Figure()
+
+    if not user_logs:
+        fig.add_annotation(
+            text="No cycle records logged yet.<br>Complete a prediction to begin tracking your personal health trajectory.",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(family=FONT_SANS, size=13, color=PALETTE["cocoa_light"])
+        )
+        fig.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor=PALETTE["white"],
+            height=280,
+            margin=dict(l=30, r=20, t=30, b=30),
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False),
+        )
+        return fig
+
+    # Sort logs by cycle_number
+    def get_val(item, attr, default=None):
+        if hasattr(item, attr):
+            v = getattr(item, attr)
+            return v if v is not None else default
+        elif isinstance(item, dict):
+            v = item.get(attr)
+            return v if v is not None else default
+        return default
+
+    sorted_logs = sorted(user_logs, key=lambda l: get_val(l, "cycle_number", 0))
+
+    cycle_nums = [get_val(l, "cycle_number", i + 1) for i, l in enumerate(sorted_logs)]
+    scores = [get_val(l, "predicted_next_health_score", get_val(l, "predicted_health_score")) for l in sorted_logs]
+    phases = [get_val(l, "cycle_phase", "General") for l in sorted_logs]
+    pains = [get_val(l, "pain_level", 0.0) for l in sorted_logs]
+    sleeps = [get_val(l, "sleep_hours_cycle", 7.5) for l in sorted_logs]
+    stresses = [get_val(l, "stress_score_cycle", 4.0) for l in sorted_logs]
+
+    # Filter cycles with valid score
+    valid_pts = [(c, s, p, pn, sl, st) for c, s, p, pn, sl, st in zip(cycle_nums, scores, phases, pains, sleeps, stresses) if s is not None]
+
+    if not valid_pts:
+        fig.add_annotation(
+            text="Logged cycles found, but no predicted health scores are attached.",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(family=FONT_SANS, size=13, color=PALETTE["cocoa_light"])
+        )
+        fig.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor=PALETTE["white"],
+            height=280,
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False),
+        )
+        return fig
+
+    x_vals = [p[0] for p in valid_pts]
+    y_vals = [p[1] for p in valid_pts]
+    custom_data = [[p[2], p[3], p[4], p[5]] for p in valid_pts]
+
+    # Cohort Benchmark line (mean = 8.55)
+    fig.add_trace(go.Scatter(
+        x=[min(x_vals) - 0.3, max(x_vals) + 0.3],
+        y=[8.55, 8.55],
+        mode="lines",
+        name="Study Cohort Mean (8.55)",
+        line=dict(color="#A8BCA0", width=1.5, dash="dash"),
+        hoverinfo="skip"
+    ))
+
+    # User trajectory line
+    fig.add_trace(go.Scatter(
+        x=x_vals,
+        y=y_vals,
+        mode="lines+markers",
+        name=f"{user_name} Health Forecast",
+        line=dict(color=PALETTE["mauve"], width=2.6),
+        marker=dict(size=8, color=PALETTE["white"], line=dict(color=PALETTE["mauve_dark"], width=2.2)),
+        customdata=custom_data,
+        hovertemplate=(
+            "<b>Cycle %{x}</b> (%{customdata[0]} Phase)<br>"
+            "Health Forecast: <b>%{y:.2f} / 10</b><br>"
+            "Pain: %{customdata[1]}/10 &bull; Sleep: %{customdata[2]}h &bull; Stress: %{customdata[3]}/10"
+            "<extra></extra>"
+        )
+    ))
+
+    fig.update_layout(
+        title=dict(
+            text=f"{user_name} Longitudinal Cycle Health Trajectory",
+            font=dict(family=FONT_SERIF, size=15.5, color=PALETTE["cocoa"])
+        ),
+        xaxis_title=dict(text="Logged Cycle Number", font=dict(family=FONT_SANS, size=11, color=PALETTE["cocoa"])),
+        yaxis_title=dict(text="Health Score (0 - 10 Scale)", font=dict(family=FONT_SANS, size=11, color=PALETTE["cocoa"])),
+        yaxis=dict(range=[4.0, 10.5], gridcolor=PALETTE["grid_line"], tickfont=dict(family=FONT_SANS, color=PALETTE["cocoa"])),
+        xaxis=dict(tickmode='linear', dtick=1, gridcolor=PALETTE["grid_line"], tickfont=dict(family=FONT_SANS, color=PALETTE["cocoa"])),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor=PALETTE["white"],
+        height=300,
+        margin=dict(l=40, r=20, t=45, b=35),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=-0.28,
+            xanchor="center",
+            x=0.5,
+            font=dict(family=FONT_SANS, size=10, color=PALETTE["cocoa"])
+        )
+    )
+    return fig
+
+
+def create_personal_biomarker_trend_chart(user_logs: List[Any]) -> go.Figure:
+    """Plot multi-cycle sleep, stress, and pain patterns across user logged cycles."""
+    fig = go.Figure()
+
+    if not user_logs or len(user_logs) < 2:
+        fig.add_annotation(
+            text="Log at least 2 cycles to unlock longitudinal biomarker trend tracking.",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(family=FONT_SANS, size=13, color=PALETTE["cocoa_light"])
+        )
+        fig.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor=PALETTE["white"],
+            height=280,
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False),
+        )
+        return fig
+
+    def get_val(item, attr, default=None):
+        if hasattr(item, attr):
+            v = getattr(item, attr)
+            return v if v is not None else default
+        elif isinstance(item, dict):
+            v = item.get(attr)
+            return v if v is not None else default
+        return default
+
+    sorted_logs = sorted(user_logs, key=lambda l: get_val(l, "cycle_number", 0))
+    cycle_nums = [get_val(l, "cycle_number", i + 1) for i, l in enumerate(sorted_logs)]
+    sleeps = [get_val(l, "sleep_hours_cycle", 0.0) for l in sorted_logs]
+    stresses = [get_val(l, "stress_score_cycle", 0.0) for l in sorted_logs]
+    pains = [get_val(l, "pain_level", 0.0) for l in sorted_logs]
+
+    # Sleep Hours
+    fig.add_trace(go.Scatter(
+        x=cycle_nums,
+        y=sleeps,
+        mode="lines+markers",
+        name="Sleep (Hours)",
+        line=dict(color=PALETTE["sage"], width=2.0),
+        marker=dict(size=6, color=PALETTE["sage"]),
+        hovertemplate="<b>Cycle %{x}</b><br>Sleep: %{y:.1f} hrs<extra></extra>"
+    ))
+
+    # Stress Score
+    fig.add_trace(go.Scatter(
+        x=cycle_nums,
+        y=stresses,
+        mode="lines+markers",
+        name="Stress (0-10)",
+        line=dict(color=PALETTE["amber"], width=2.0),
+        marker=dict(size=6, color=PALETTE["amber"]),
+        hovertemplate="<b>Cycle %{x}</b><br>Stress: %{y:.1f} / 10<extra></extra>"
+    ))
+
+    # Pain Level
+    fig.add_trace(go.Scatter(
+        x=cycle_nums,
+        y=pains,
+        mode="lines+markers",
+        name="Pain (0-10)",
+        line=dict(color=PALETTE["dusty_rose"], width=2.0),
+        marker=dict(size=6, color=PALETTE["dusty_rose"]),
+        hovertemplate="<b>Cycle %{x}</b><br>Pain: %{y:.1f} / 10<extra></extra>"
+    ))
+
+    fig.update_layout(
+        title=dict(
+            text="Personal Biomarker Consistency Across Logged Cycles",
+            font=dict(family=FONT_SERIF, size=15.5, color=PALETTE["cocoa"])
+        ),
+        xaxis_title=dict(text="Logged Cycle Number", font=dict(family=FONT_SANS, size=11, color=PALETTE["cocoa"])),
+        yaxis_title=dict(text="Reported Value (Hours / 0-10 Score)", font=dict(family=FONT_SANS, size=11, color=PALETTE["cocoa"])),
+        yaxis=dict(range=[0, 11], gridcolor=PALETTE["grid_line"], tickfont=dict(family=FONT_SANS, color=PALETTE["cocoa"])),
+        xaxis=dict(tickmode='linear', dtick=1, gridcolor=PALETTE["grid_line"], tickfont=dict(family=FONT_SANS, color=PALETTE["cocoa"])),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor=PALETTE["white"],
+        height=300,
+        margin=dict(l=40, r=20, t=45, b=35),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=-0.28,
+            xanchor="center",
+            x=0.5,
+            font=dict(family=FONT_SANS, size=10, color=PALETTE["cocoa"])
+        )
+    )
+    return fig
+
+
 def create_model_comparison_bar_chart() -> go.Figure:
     """Create a verified comparison chart of MAE and RMSE across evaluated models.
     

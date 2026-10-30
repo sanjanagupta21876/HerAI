@@ -36,6 +36,8 @@ from herai.visualizations import (
     create_cohort_distribution_chart,
     create_cycle_length_distribution_chart,
     create_user_trajectory_chart,
+    create_personal_health_trajectory_chart,
+    create_personal_biomarker_trend_chart,
     create_feature_importance_chart,
     create_model_comparison_bar_chart,
     create_phase_distribution_chart,
@@ -60,6 +62,8 @@ from herai.database import (
     has_completed_onboarding,
     validate_profile_inputs,
     UserProfileRecord,
+    UserCycleLogRecord,
+    get_user_dashboard_stats,
     ProfileValidationError,
     UserAlreadyExistsError,
     ValidationError as DBValidationError,
@@ -1132,13 +1136,17 @@ def render_profile_view():
     # VIEW MODE
     # -------------------------------------------------------------------------
     if not st.session_state.profile_edit_mode:
-        head_c1, head_c2 = st.columns([3, 1], vertical_alignment="center")
+        head_c1, head_c2, head_c3 = st.columns([2.0, 1.2, 0.9], vertical_alignment="center")
         with head_c1:
             display_name = (profile.preferred_name if profile and profile.preferred_name else user_record.get("full_name") or user_record.get("username") or "User")
             st.markdown(f"<h3 style='margin: 0; color: #59433F;'>Hello, {display_name}</h3>", unsafe_allow_html=True)
         with head_c2:
             if st.button("Edit Profile Information", key="btn_enter_edit_profile", type="primary", use_container_width=True):
                 st.session_state.profile_edit_mode = True
+                st.rerun()
+        with head_c3:
+            if st.button("Dashboard", key="btn_prof_return_dash", type="secondary", use_container_width=True):
+                st.session_state.current_page = "Dashboard"
                 st.rerun()
 
         st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
@@ -1388,9 +1396,405 @@ def render_profile_view():
 # =============================================================================
 # VIEW 1: DASHBOARD
 # =============================================================================
-def render_dashboard(cohort_df: pd.DataFrame):
-    """Render the Main Dashboard with Welcome Hero, Overview Cards, and Cohort Visualizations."""
-    # B. Landing page / Introduction section
+def _render_authenticated_dashboard(user_id: str, cohort_df: pd.DataFrame):
+    """Render personalized dashboard strictly displaying the authenticated user's private records."""
+    stats = get_user_dashboard_stats(user_id)
+    profile = stats["profile"]
+    user_logs = get_user_cycle_logs(user_id)
+    user_record = st.session_state.get("current_user") or {}
+
+    display_name = (
+        profile.preferred_name
+        if profile and profile.preferred_name
+        else (user_record.get("full_name") or user_record.get("username") or "Friend")
+    ).strip()
+
+    today_str = datetime.now().strftime("%A, %B %d, %Y")
+
+    # Dynamic Cycle Status Evaluation
+    if profile and profile.track_cycle:
+        if stats["estimated_cycle_day"] is not None:
+            cycle_status_pill = f"Cycle Day {stats['estimated_cycle_day']} &bull; {stats['estimated_phase']} Phase"
+            cycle_status_text = (
+                f"Last period began on {profile.last_period_date} ({stats['days_since_last_period']} days ago). "
+                f"Your baseline cycle length is {profile.typical_cycle_length or 28} days with a typical duration of {profile.typical_period_duration or 5} days."
+            )
+        elif profile.last_period_date:
+            cycle_status_pill = "Baseline Active"
+            cycle_status_text = (
+                f"Last period recorded on {profile.last_period_date}. "
+                f"Target cycle length: {profile.typical_cycle_length or 28} days."
+            )
+        else:
+            cycle_status_pill = "Cycle Tracking Active &bull; Period Date Needed"
+            cycle_status_text = (
+                "Set your last period start date in your profile to display dynamic cycle-day calculations and phase estimations."
+            )
+    else:
+        cycle_status_pill = "Cycle Tracking Paused"
+        cycle_status_text = "Tracking lifestyle biomarkers, rest consistency, and wellness patterns."
+
+    # Active Wellness Topics Badges
+    wellness_tags_html = ""
+    if profile and profile.wellness_interests:
+        pills = "".join([
+            f'<span class="step-pill" style="margin-right: 6px; margin-top: 4px; display: inline-block;">{t}</span>'
+            for t in profile.wellness_interests[:5]
+        ])
+        wellness_tags_html = (
+            f'<div style="margin-top: 10px;">'
+            f'<span style="font-size: 0.74rem; font-weight: 700; text-transform: uppercase; color: var(--color-mauve); margin-right: 8px;">Wellness Focus:</span>'
+            f'{pills}'
+            f'</div>'
+        )
+
+    greeting_title = f"Welcome back, {display_name}" if stats["total_cycles"] > 0 else f"Welcome to HERAI, {display_name}"
+
+    # Welcoming Hero Banner
+    st.markdown(f"""
+    <div class="hero-banner" style="padding: 22px 28px; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px;">
+            <div class="badge-pill">{cycle_status_pill}</div>
+            <div style="font-size: 0.82rem; font-weight: 600; color: #7A6560;">{today_str}</div>
+        </div>
+        <div class="hero-headline" style="font-size: 2.05rem; margin-top: 4px; margin-bottom: 6px;">{greeting_title}</div>
+        <div class="hero-subtext" style="font-size: 0.94rem; max-width: 850px;">
+            {cycle_status_text}
+        </div>
+        {wellness_tags_html}
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Quick Navigation / Actions Row
+    qa_c1, qa_c2, qa_c3 = st.columns([1.5, 1.3, 3.2], vertical_alignment="center")
+    with qa_c1:
+        if st.button("Log Cycle / Predict Score", key="dash_btn_log_cycle", type="primary", use_container_width=True):
+            st.session_state.current_page = "Health Prediction"
+            st.rerun()
+    with qa_c2:
+        if st.button("Manage Profile", key="dash_btn_edit_profile", type="secondary", use_container_width=True):
+            st.session_state.current_page = "Profile"
+            st.session_state.profile_edit_mode = False
+            st.rerun()
+    with qa_c3:
+        st.caption("Personal predictions and cycle records remain strictly private and encrypted on your local database.")
+
+    st.markdown("<hr style='margin: 18px 0; border: none; border-top: 1px solid #F0E2DA;'>", unsafe_allow_html=True)
+
+    # Personal Metrics Overview Cards
+    st.markdown("### Your Personal Wellness Overview")
+
+    c1, c2, c3, c4 = st.columns(4)
+
+    # Card 1: Cycle Baseline
+    with c1:
+        cycle_val = f"{stats['avg_cycle_length']} Days" if stats['avg_cycle_length'] else "28.0 Days"
+        cycle_lbl = "Observed Cycle Average" if stats['total_cycles'] > 0 else "Baseline Cycle Length"
+        cycle_det = (
+            f"Duration: {profile.typical_period_duration or 5}d &bull; {profile.cycle_regularity or 'Regular'}"
+            if profile
+            else "Default 28-day baseline"
+        )
+        st.markdown(f"""
+        <div class="metric-stat-box" style="border-top: 3px solid var(--color-mauve);">
+            <div>
+                <div class="metric-stat-label">{cycle_lbl}</div>
+                <div class="metric-stat-value">{cycle_val}</div>
+            </div>
+            <div class="metric-stat-detail">{cycle_det}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Card 2: Recorded Cycles
+    with c2:
+        logged_val = f"{stats['total_cycles']} Logged"
+        logged_det = (
+            f"Latest: Cycle #{stats['latest_cycle'].cycle_number} ({stats['latest_cycle'].cycle_phase or 'General'})"
+            if stats['latest_cycle']
+            else "No cycle logs recorded yet"
+        )
+        st.markdown(f"""
+        <div class="metric-stat-box" style="border-top: 3px solid var(--color-sage);">
+            <div>
+                <div class="metric-stat-label" style="color: #4D6B45;">Private Records</div>
+                <div class="metric-stat-value">{logged_val}</div>
+            </div>
+            <div class="metric-stat-detail">{logged_det}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Card 3: Latest Health Score Forecast
+    with c3:
+        if stats['latest_health_score'] is not None:
+            tier_color = "#2D5028" if stats['latest_health_tier'] == "Optimal" else "#8C4E1A"
+            st.markdown(f"""
+            <div class="metric-stat-box" style="border-top: 3px solid var(--color-dusty-rose); background: #FFFAF5;">
+                <div>
+                    <div class="metric-stat-label" style="color: #9E5664;">Latest Health Forecast</div>
+                    <div class="metric-stat-value">{stats['latest_health_score']:.2f} <span style="font-size: 0.95rem; color: #7A6560;">/ 10</span></div>
+                </div>
+                <div class="metric-stat-detail" style="font-weight: 600; color: {tier_color};">{stats['latest_health_tier'] or 'Standard'} Health Tier</div>
+            </div>
+            """, unsafe_allow_html=True)
+        elif st.session_state.get("last_prediction") is not None:
+            pred = st.session_state.last_prediction
+            st.markdown(f"""
+            <div class="metric-stat-box" style="border-top: 3px solid var(--color-amber); background: #FFFAF5;">
+                <div>
+                    <div class="metric-stat-label" style="color: #A35216;">Session Forecast</div>
+                    <div class="metric-stat-value">{pred.predicted_next_health_score:.2f} <span style="font-size: 0.95rem; color: #7A6560;">/ 10</span></div>
+                </div>
+                <div class="metric-stat-detail">{pred.score_category} Tier (Unsaved)</div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div class="metric-stat-box" style="border-top: 3px solid #D6C7C0; background: #FAF7F5;">
+                <div>
+                    <div class="metric-stat-label" style="color: #8C7B76;">Latest Health Forecast</div>
+                    <div class="metric-stat-value" style="font-size: 1.25rem; color: #8F7B76; padding-top: 4px;">No Forecast Yet</div>
+                </div>
+                <div class="metric-stat-detail">Log cycle to generate score</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # Card 4: Baseline Lifestyle Biomarkers
+    with c4:
+        sleep_hrs = stats['avg_sleep'] if stats['avg_sleep'] is not None else (profile.sleep_hours if profile and profile.sleep_hours else 7.5)
+        water_amt = f"{profile.water_intake_liters:.1f}L" if profile and profile.water_intake_liters else "2.0L"
+        stress_val = f"{stats['avg_stress']:.1f}/10" if stats['avg_stress'] is not None else (f"{profile.stress_score_baseline:.1f}/10" if profile and profile.stress_score_baseline else "4.0/10")
+        st.markdown(f"""
+        <div class="metric-stat-box" style="border-top: 3px solid var(--color-amber);">
+            <div>
+                <div class="metric-stat-label" style="color: #A35216;">Lifestyle Baselines</div>
+                <div class="metric-stat-value">{sleep_hrs:.1f}h Sleep</div>
+            </div>
+            <div class="metric-stat-detail">Water: {water_amt} &bull; Stress: {stress_val}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<div style='margin-top: 18px;'></div>", unsafe_allow_html=True)
+
+    # Multi-tab Dashboard Experience
+    dash_tab1, dash_tab2, dash_tab3 = st.tabs([
+        "My Personal Health Journey",
+        "Research Cohort Benchmarks",
+        "Personalized Wellness Guidance"
+    ])
+
+    # -------------------------------------------------------------------------
+    # TAB 1: MY PERSONAL HEALTH JOURNEY
+    # -------------------------------------------------------------------------
+    with dash_tab1:
+        if not user_logs:
+            # Elegant, encouraging Empty State
+            es_c1, es_c2 = st.columns([1.6, 1.4], gap="medium")
+            with es_c1:
+                st.markdown("""
+                <div class="empty-state-card" style="text-align: left; padding: 26px 28px;">
+                    <div class="badge-pill">Private Health Records</div>
+                    <div style="font-family: var(--font-serif); font-size: 1.45rem; color: var(--color-cocoa); margin-bottom: 8px;">
+                        Your Personal Health Journey Begins Here
+                    </div>
+                    <p style="font-size: 0.90rem; color: #6E5752; line-height: 1.55; margin-bottom: 18px;">
+                        You have not recorded any private cycle entries yet. Once you enter your current cycle parameters and run a health score prediction, your multi-cycle trajectory, discomfort patterns, and biomarker trends will appear here.
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+                if st.button("Record Your First Cycle & Forecast", key="dash_btn_empty_start", type="primary", use_container_width=True):
+                    st.session_state.current_page = "Health Prediction"
+                    st.rerun()
+
+            with es_c2:
+                st.markdown("""
+                <div class="card-surface" style="padding: 22px 24px;">
+                    <div class="card-header-serif">Your Saved Baseline Profile</div>
+                """, unsafe_allow_html=True)
+                if profile:
+                    st.markdown(f"""
+                    <div style="font-size: 0.88rem; line-height: 1.6; color: #59433F;">
+                        <b>Preferred Name:</b> {display_name}<br>
+                        <b>Cycle Length:</b> {profile.typical_cycle_length or 28} Days<br>
+                        <b>Period Duration:</b> {profile.typical_period_duration or 5} Days<br>
+                        <b>Regularity:</b> {profile.cycle_regularity or 'Regular'}<br>
+                        <b>Tracking Status:</b> {'Active Tracking' if profile.track_cycle else 'Paused / Lifestyle Only'}
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.caption("No baseline profile details found. Complete onboarding or edit profile.")
+
+                st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+                if st.button("Edit Profile Baseline", key="dash_btn_empty_edit", type="secondary", use_container_width=True):
+                    st.session_state.current_page = "Profile"
+                    st.session_state.profile_edit_mode = True
+                    st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
+        else:
+            # Authenticated User has 1 or more saved cycle records
+            st.markdown('<div class="card-surface"><div class="card-header-serif">Personal Longitudinal Health Score Trajectory</div>', unsafe_allow_html=True)
+            fig_traj = create_personal_health_trajectory_chart(user_logs, user_name=f"{display_name}'s")
+            st.plotly_chart(fig_traj, use_container_width=True, config={"displayModeBar": False})
+            st.caption("Observed health forecast scores across your saved cycles. The dashed reference line represents the 8.55 cohort mean baseline.")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            if len(user_logs) >= 2:
+                st.markdown('<div class="card-surface"><div class="card-header-serif">Biomarker Consistency Across Sequential Cycles</div>', unsafe_allow_html=True)
+                fig_bio = create_personal_biomarker_trend_chart(user_logs)
+                st.plotly_chart(fig_bio, use_container_width=True, config={"displayModeBar": False})
+                st.caption("Trends in sleep duration, subjective stress, and discomfort level over time.")
+                st.markdown('</div>', unsafe_allow_html=True)
+            else:
+                st.info("Log 2 or more cycles to unlock longitudinal biomarker trend tracking and correlation analysis.")
+
+            # History Table of Saved Cycle Records
+            st.markdown('<div class="card-surface"><div class="card-header-serif">Recent Cycle Activity & Saved Records</div>', unsafe_allow_html=True)
+            hist_records = []
+            for entry in user_logs:
+                hist_records.append({
+                    "Cycle #": entry.cycle_number,
+                    "Phase": entry.cycle_phase or "General",
+                    "Cycle Length (Days)": entry.cycle_length_days,
+                    "Flow": entry.flow_level or "Medium",
+                    "Pain (0-10)": entry.pain_level if entry.pain_level is not None else "N/A",
+                    "Stress (0-10)": entry.stress_score_cycle if entry.stress_score_cycle is not None else "N/A",
+                    "Sleep (Hrs)": entry.sleep_hours_cycle if entry.sleep_hours_cycle is not None else "N/A",
+                    "Predicted Score": f"{entry.predicted_next_health_score:.2f} / 10" if entry.predicted_next_health_score is not None else "N/A",
+                    "Health Tier": entry.score_category or "Standard",
+                    "Logged On": entry.created_at[:10] if entry.created_at else "",
+                })
+            st.dataframe(pd.DataFrame(hist_records), use_container_width=True, hide_index=True)
+
+            btn_log_more_col, _ = st.columns([1.5, 3.5])
+            with btn_log_more_col:
+                if st.button("Log Next Cycle Entry", key="dash_btn_log_next", type="primary", use_container_width=True):
+                    st.session_state.current_page = "Health Prediction"
+                    st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    # -------------------------------------------------------------------------
+    # TAB 2: RESEARCH COHORT BENCHMARKS
+    # -------------------------------------------------------------------------
+    with dash_tab2:
+        st.markdown("""
+        <div style="background: #FAF7F5; border: 1px solid #EADBCE; border-radius: 8px; padding: 14px 18px; margin-bottom: 16px; font-size: 0.86rem; color: #59433F;">
+            <b>Population Reference Context:</b> These distributions reflect the 15,976 anonymized records from 2,000 subjects in the research training dataset. 
+            Your private data is never merged into this public benchmark. Use these charts to understand population variability.
+        </div>
+        """, unsafe_allow_html=True)
+
+        chart_c1, chart_c2 = st.columns([1, 1], gap="medium")
+
+        with chart_c1:
+            st.markdown('<div class="card-surface"><div class="card-header-serif">Observed Cycle Length Distribution</div>', unsafe_allow_html=True)
+            if not cohort_df.empty and "cycle_length_days" in cohort_df.columns:
+                fig_len = create_cycle_length_distribution_chart(cohort_df["cycle_length_days"])
+                st.plotly_chart(fig_len, use_container_width=True, config={"displayModeBar": False})
+                st.caption("Distribution across 15,976 cycles is centered at 28.0 days (median: 28.0, std: ±2.4).")
+            else:
+                st.info("Loading reference cycle length distribution...")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        with chart_c2:
+            st.markdown('<div class="card-surface"><div class="card-header-serif">Cohort Health Score Distribution</div>', unsafe_allow_html=True)
+            if not cohort_df.empty and "next_health_score" in cohort_df.columns:
+                user_val = stats["latest_health_score"]
+                fig_dist = create_cohort_distribution_chart(cohort_df["next_health_score"].dropna(), user_val)
+                st.plotly_chart(fig_dist, use_container_width=True, config={"displayModeBar": False})
+                st.caption("Distribution parameters: Mean = 8.55, Median = 8.60, Std = 1.11, Range = [4.40, 10.00].")
+            else:
+                st.info("Loading reference health score distribution...")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown('<div class="card-surface"><div class="card-header-serif">Longitudinal Cycle Trajectory in Research Study Records</div>', unsafe_allow_html=True)
+        if not cohort_df.empty and "user_id" in cohort_df.columns:
+            p_col1, p_col2 = st.columns([1, 3], vertical_alignment="center")
+            with p_col1:
+                sample_ids = ["U00001", "U00002", "U00003", "U00004", "U00005"]
+                selected_id = st.selectbox("Inspect Anonymized Research Subject:", sample_ids, index=0)
+                st.caption("Consecutive cycles for selected research subjects from the benchmark dataset.")
+            with p_col2:
+                fig_traj = create_user_trajectory_chart(cohort_df, selected_id)
+                st.plotly_chart(fig_traj, use_container_width=True, config={"displayModeBar": False})
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # -------------------------------------------------------------------------
+    # TAB 3: PERSONALIZED WELLNESS GUIDANCE
+    # -------------------------------------------------------------------------
+    with dash_tab3:
+        st.markdown('<div class="badge-pill">Evidence-Based Holistic Care</div>', unsafe_allow_html=True)
+        st.markdown("<h3>Personalized Lifestyle & Wellness Insights</h3>", unsafe_allow_html=True)
+        st.markdown("Empirical guidance tailored to your recorded cycle patterns and selected wellness priorities:")
+
+        interests = profile.wellness_interests if profile and profile.wellness_interests else []
+
+        w_col1, w_col2 = st.columns(2, gap="medium")
+
+        with w_col1:
+            st.markdown("""
+            <div class="card-surface">
+                <div class="card-header-serif">Rest & Nervous System Regulation</div>
+                <p style="font-size: 0.88rem; line-height: 1.55; color: #59433F;">
+                    <b>Circadian Rhythm Stability:</b> Maintaining a consistent sleep-wake schedule stabilizes melatonin and cortisol rhythms. 
+                    During the late luteal phase, baseline core body temperature elevates by ~0.3–0.5°C; keeping your bedroom cooler supports deep REM cycles.
+                </p>
+                <p style="font-size: 0.88rem; line-height: 1.55; color: #59433F; margin-bottom: 0;">
+                    <b>Down-Regulation Practices:</b> 15–20 minutes of restorative movement, box breathing, or gentle walking reduces sympathetic tone and supports cycle regularity.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            if "Symptom tracking & discomfort" in interests or not interests:
+                st.markdown("""
+                <div class="card-surface">
+                    <div class="card-header-serif">Pelvic Comfort & Discomfort Relief</div>
+                    <p style="font-size: 0.88rem; line-height: 1.55; color: #59433F;">
+                        <b>Thermal Therapy:</b> Continuous local heat application (40°C heating pads) provides clinically proven vasodilation, easing uterine smooth-muscle contractions.
+                    </p>
+                    <p style="font-size: 0.88rem; line-height: 1.55; color: #59433F; margin-bottom: 0;">
+                        <b>Targeted Micronutrients:</b> Magnesium glycinate and omega-3 fatty acids assist prostaglandin regulation and cellular recovery.
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+
+        with w_col2:
+            st.markdown("""
+            <div class="card-surface">
+                <div class="card-header-serif">Hydration & Cycle-Phase Nutrition</div>
+                <p style="font-size: 0.88rem; line-height: 1.55; color: #59433F;">
+                    <b>Cellular Hydration:</b> Aim for 2.0 to 2.5 litres of water daily. Adequate hydration maintains blood volume, alleviates water-retention bloating, and reduces fatigue.
+                </p>
+                <p style="font-size: 0.88rem; line-height: 1.55; color: #59433F; margin-bottom: 0;">
+                    <b>Phase-Specific Nutrition:</b> Increase iron-dense foods (spinach, lentils) during menstruation. Emphasize complex carbohydrates and fiber during the luteal phase to stabilize serotonin.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            if "Physical activity & energy" in interests or not interests:
+                st.markdown("""
+                <div class="card-surface">
+                    <div class="card-header-serif">Cycle-Synced Movement Principles</div>
+                    <p style="font-size: 0.88rem; line-height: 1.55; color: #59433F;">
+                        <b>Menstrual Phase:</b> Gentle stretching, walking, or restorative yoga.
+                    </p>
+                    <p style="font-size: 0.88rem; line-height: 1.55; color: #59433F; margin-bottom: 0;">
+                        <b>Follicular &amp; Ovulatory Phases:</b> Progressive resistance training, aerobic sessions, and higher intensity movement as estrogen peaks.
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+
+        st.markdown("""
+        <div class="callout-lavender" style="margin-top: 14px;">
+            <b style="color: #59433F; font-size: 0.90rem;">Educational Disclaimer:</b><br>
+            <span style="font-size: 0.85rem; color: #59433F; line-height: 1.5;">
+            Wellness guidelines are provided strictly for physiological literacy. HERAI does not diagnose medical conditions, provide medical treatment, or offer contraceptive planning.
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+
+
+def _render_guest_dashboard(cohort_df: pd.DataFrame):
+    """Render public guest dashboard with system capabilities, research benchmarks, and sign-in invitations."""
+    # Landing page / Introduction section
     st.markdown("""
     <div class="hero-banner">
         <div class="badge-pill">Clinical ML Prototype &bull; Non-Diagnostic</div>
@@ -1415,13 +1819,31 @@ def render_dashboard(cohort_df: pd.DataFrame):
             st.session_state.current_page = "Model Insights"
             st.rerun()
 
+        st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+        btn_auth = st.button("Sign In / Join to Personalize", use_container_width=True, key="btn_hero_auth", type="secondary")
+        if btn_auth:
+            st.session_state.current_page = "Sign In"
+            st.rerun()
+
     with wave_col:
         fig_wave = create_cycle_wave_hero()
         st.plotly_chart(fig_wave, use_container_width=True, config={"displayModeBar": False})
 
     st.markdown("<hr style='margin: 20px 0; border: none; border-top: 1px solid #F0E2DA;'>", unsafe_allow_html=True)
 
-    # C. Overview Cards
+    # Guest Personalized Value Callout
+    st.markdown("""
+    <div style="background: #FAF7F5; border: 1px dashed #D99AA5; border-radius: 10px; padding: 16px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+        <div>
+            <b style="color: #59433F; font-size: 0.94rem;">Personalized Health Tracking Available</b>
+            <div style="font-size: 0.85rem; color: #7A6560; margin-top: 2px;">
+                Create a private account to save your sequential cycle records, auto-fill baseline lifestyle inputs, and preserve your health patterns securely across sessions.
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Overview Cards
     st.markdown("### System & Cohort Overview")
 
     c1, c2, c3, c4 = st.columns(4)
@@ -1533,6 +1955,17 @@ def render_dashboard(cohort_df: pd.DataFrame):
                 fig_traj = create_user_trajectory_chart(cohort_df, selected_id)
                 st.plotly_chart(fig_traj, use_container_width=True, config={"displayModeBar": False})
         st.markdown('</div>', unsafe_allow_html=True)
+
+
+def render_dashboard(cohort_df: pd.DataFrame):
+    """Render the Main Dashboard routing cleanly between Authenticated and Guest experiences."""
+    is_auth = bool(st.session_state.get("authenticated") and st.session_state.get("current_user"))
+    user_id = get_current_user_id() if is_auth else None
+
+    if is_auth and user_id:
+        _render_authenticated_dashboard(user_id=user_id, cohort_df=cohort_df)
+    else:
+        _render_guest_dashboard(cohort_df=cohort_df)
 
 
 # =============================================================================

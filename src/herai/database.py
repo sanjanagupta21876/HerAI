@@ -773,6 +773,75 @@ def has_completed_onboarding(user_id: str, db_path: Optional[Path] = None) -> bo
 # =============================================================================
 # USER CYCLE LOGS (STRICT USER_ID ISOLATION)
 # =============================================================================
+@dataclass
+class UserCycleLogRecord:
+    """Represents a single historical cycle record for an authenticated user."""
+    id: str
+    user_id: str
+    cycle_number: int
+    cycle_length_days: Optional[float] = None
+    cycle_phase: Optional[str] = None
+    flow_level: Optional[str] = None
+    pain_level: Optional[float] = None
+    pms_symptoms: Optional[str] = None
+    mood_score: Optional[float] = None
+    stress_score_cycle: Optional[float] = None
+    sleep_hours_cycle: Optional[float] = None
+    energy_level: Optional[float] = None
+    concentration_score: Optional[float] = None
+    work_hours_lost: Optional[float] = None
+    predicted_next_health_score: Optional[float] = None
+    score_category: Optional[str] = None
+    created_at: str = ""
+
+    # Property aliases for seamless compatibility with both UI conventions and DB schemas
+    @property
+    def predicted_health_score(self) -> Optional[float]:
+        return self.predicted_next_health_score
+
+    @property
+    def prediction_tier(self) -> Optional[str]:
+        return self.score_category
+
+    def __getitem__(self, key: str) -> Any:
+        if key == "predicted_health_score":
+            return self.predicted_next_health_score
+        if key == "prediction_tier":
+            return self.score_category
+        return getattr(self, key)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        if key == "predicted_health_score":
+            return self.predicted_next_health_score
+        if key == "prediction_tier":
+            return self.score_category
+        return getattr(self, key, default)
+
+    def __contains__(self, key: str) -> bool:
+        return hasattr(self, key) or key in ("predicted_health_score", "prediction_tier")
+
+    def __iter__(self):
+        return iter(self.to_dict())
+
+    def __len__(self) -> int:
+        return len(self.to_dict())
+
+    def keys(self):
+        return self.to_dict().keys()
+
+    def values(self):
+        return self.to_dict().values()
+
+    def items(self):
+        return self.to_dict().items()
+
+    def to_dict(self) -> Dict[str, Any]:
+        d = asdict(self)
+        d["predicted_health_score"] = self.predicted_next_health_score
+        d["prediction_tier"] = self.score_category
+        return d
+
+
 def get_next_cycle_number(user_id: str, db_path: Optional[Path] = None) -> int:
     """Calculate the sequential cycle number for the user's next log entry."""
     init_db(db_path)
@@ -787,7 +856,10 @@ def get_next_cycle_number(user_id: str, db_path: Optional[Path] = None) -> int:
 
 def save_user_cycle_log(
     user_id: str,
-    log_data: Dict[str, Any],
+    log_data: Optional[Dict[str, Any]] = None,
+    cycle_data: Optional[Dict[str, Any]] = None,
+    predicted_score: Optional[float] = None,
+    prediction_tier: Optional[str] = None,
     db_path: Optional[Path] = None,
 ) -> str:
     """Persist a single cycle record strictly owned by user_id."""
@@ -800,10 +872,27 @@ def save_user_cycle_log(
     if not user:
         raise UserNotFoundError(f"User '{user_id}' does not exist.")
 
+    # Unify flexible calling conventions
+    merged: Dict[str, Any] = {}
+    if log_data:
+        merged.update(log_data)
+    if cycle_data:
+        merged.update(cycle_data)
+    if predicted_score is not None:
+        merged["predicted_next_health_score"] = float(predicted_score)
+    if prediction_tier is not None:
+        merged["score_category"] = str(prediction_tier)
+
+    # Normalize aliases if present
+    if "predicted_health_score" in merged and "predicted_next_health_score" not in merged:
+        merged["predicted_next_health_score"] = merged["predicted_health_score"]
+    if "prediction_tier" in merged and "score_category" not in merged:
+        merged["score_category"] = merged["prediction_tier"]
+
     log_id = f"log_{uuid.uuid4().hex[:16]}"
     now_utc = datetime.now(timezone.utc).isoformat()
 
-    cycle_num = log_data.get("cycle_number")
+    cycle_num = merged.get("cycle_number")
     if cycle_num is None:
         cycle_num = get_next_cycle_number(user_id, db_path=db_path)
 
@@ -837,19 +926,19 @@ def save_user_cycle_log(
                 log_id,
                 user_id,
                 int(cycle_num),
-                log_data.get("cycle_length_days"),
-                log_data.get("cycle_phase"),
-                log_data.get("flow_level"),
-                log_data.get("pain_level"),
-                log_data.get("pms_symptoms"),
-                log_data.get("mood_score"),
-                log_data.get("stress_score_cycle"),
-                log_data.get("sleep_hours_cycle"),
-                log_data.get("energy_level"),
-                log_data.get("concentration_score"),
-                log_data.get("work_hours_lost"),
-                log_data.get("predicted_next_health_score"),
-                log_data.get("score_category"),
+                merged.get("cycle_length_days"),
+                merged.get("cycle_phase"),
+                merged.get("flow_level"),
+                merged.get("pain_level"),
+                merged.get("pms_symptoms"),
+                merged.get("mood_score"),
+                merged.get("stress_score_cycle"),
+                merged.get("sleep_hours_cycle"),
+                merged.get("energy_level"),
+                merged.get("concentration_score"),
+                merged.get("work_hours_lost"),
+                merged.get("predicted_next_health_score"),
+                merged.get("score_category"),
                 now_utc,
             )
         )
@@ -858,16 +947,16 @@ def save_user_cycle_log(
 
 def get_user_cycle_logs(
     user_id: str,
+    limit: Optional[int] = None,
     db_path: Optional[Path] = None,
-) -> List[Dict[str, Any]]:
+) -> List[UserCycleLogRecord]:
     """Retrieve all historical cycle logs strictly owned by user_id, ordered chronologically."""
     init_db(db_path)
     if not user_id:
         return []
 
     with get_db_connection(db_path) as conn:
-        cursor = conn.execute(
-            """
+        query = """
             SELECT id, user_id, cycle_number, cycle_length_days, cycle_phase,
                    flow_level, pain_level, pms_symptoms, mood_score,
                    stress_score_cycle, sleep_hours_cycle, energy_level,
@@ -876,8 +965,127 @@ def get_user_cycle_logs(
             FROM user_cycle_logs
             WHERE user_id = ?
             ORDER BY cycle_number ASC
-            """,
-            (user_id,)
-        )
-        return [dict(row) for row in cursor.fetchall()]
+        """
+        params: List[Any] = [user_id]
+        if limit is not None and isinstance(limit, int) and limit > 0:
+            query += " LIMIT ?"
+            params.append(limit)
+
+        cursor = conn.execute(query, tuple(params))
+        rows = cursor.fetchall()
+        return [
+            UserCycleLogRecord(
+                id=row["id"],
+                user_id=row["user_id"],
+                cycle_number=row["cycle_number"],
+                cycle_length_days=row["cycle_length_days"],
+                cycle_phase=row["cycle_phase"],
+                flow_level=row["flow_level"],
+                pain_level=row["pain_level"],
+                pms_symptoms=row["pms_symptoms"],
+                mood_score=row["mood_score"],
+                stress_score_cycle=row["stress_score_cycle"],
+                sleep_hours_cycle=row["sleep_hours_cycle"],
+                energy_level=row["energy_level"],
+                concentration_score=row["concentration_score"],
+                work_hours_lost=row["work_hours_lost"],
+                predicted_next_health_score=row["predicted_next_health_score"],
+                score_category=row["score_category"],
+                created_at=row["created_at"] or "",
+            )
+            for row in rows
+        ]
+
+
+def get_user_dashboard_stats(
+    user_id: str,
+    db_path: Optional[Path] = None,
+) -> Dict[str, Any]:
+    """Calculate personalized aggregated wellness and cycle metrics strictly for user_id."""
+    init_db(db_path)
+    if not user_id:
+        return {
+            "total_cycles": 0,
+            "avg_cycle_length": None,
+            "latest_cycle": None,
+            "latest_health_score": None,
+            "latest_health_tier": None,
+            "avg_sleep": None,
+            "avg_stress": None,
+            "avg_pain": None,
+            "days_since_last_period": None,
+            "estimated_cycle_day": None,
+            "estimated_phase": None,
+            "profile": None,
+        }
+
+    profile = get_user_profile(user_id, db_path=db_path)
+    logs = get_user_cycle_logs(user_id, db_path=db_path)
+
+    total_cycles = len(logs)
+    avg_cycle_length = None
+    latest_cycle = logs[-1] if logs else None
+    latest_health_score = latest_cycle.predicted_next_health_score if latest_cycle else None
+    latest_health_tier = latest_cycle.score_category if latest_cycle else None
+
+    # Calculate averages from logs if present
+    valid_lengths = [l.cycle_length_days for l in logs if l.cycle_length_days is not None]
+    if valid_lengths:
+        avg_cycle_length = round(sum(valid_lengths) / len(valid_lengths), 1)
+    elif profile and profile.typical_cycle_length:
+        avg_cycle_length = float(profile.typical_cycle_length)
+
+    valid_sleep = [l.sleep_hours_cycle for l in logs if l.sleep_hours_cycle is not None]
+    avg_sleep = round(sum(valid_sleep) / len(valid_sleep), 1) if valid_sleep else (profile.sleep_hours if profile else None)
+
+    valid_stress = [l.stress_score_cycle for l in logs if l.stress_score_cycle is not None]
+    avg_stress = round(sum(valid_stress) / len(valid_stress), 1) if valid_stress else (profile.stress_score_baseline if profile else None)
+
+    valid_pain = [l.pain_level for l in logs if l.pain_level is not None]
+    avg_pain = round(sum(valid_pain) / len(valid_pain), 1) if valid_pain else None
+
+    # Cycle phase estimation based on last_period_date
+    days_since_last_period = None
+    estimated_cycle_day = None
+    estimated_phase = None
+
+    if profile and profile.track_cycle and profile.last_period_date:
+        try:
+            last_date = datetime.strptime(profile.last_period_date, "%Y-%m-%d").date()
+            today = date.today()
+            delta = (today - last_date).days
+            if 0 <= delta <= 120:
+                days_since_last_period = delta
+                estimated_cycle_day = delta + 1
+                cycle_len = profile.typical_cycle_length or 28
+                period_dur = profile.typical_period_duration or 5
+
+                if estimated_cycle_day <= period_dur:
+                    estimated_phase = "Menstrual"
+                elif estimated_cycle_day <= max(period_dur + 1, int(cycle_len * 0.45)):
+                    estimated_phase = "Follicular"
+                elif estimated_cycle_day <= max(period_dur + 2, int(cycle_len * 0.55)):
+                    estimated_phase = "Ovulatory"
+                elif estimated_cycle_day <= cycle_len:
+                    estimated_phase = "Luteal"
+                else:
+                    estimated_phase = "Late / Extended"
+        except Exception:
+            pass
+
+    return {
+        "total_cycles": total_cycles,
+        "avg_cycle_length": avg_cycle_length,
+        "latest_cycle": latest_cycle,
+        "latest_health_score": latest_health_score,
+        "latest_health_tier": latest_health_tier,
+        "avg_sleep": avg_sleep,
+        "avg_stress": avg_stress,
+        "avg_pain": avg_pain,
+        "days_since_last_period": days_since_last_period,
+        "estimated_cycle_day": estimated_cycle_day,
+        "estimated_phase": estimated_phase,
+        "profile": profile,
+    }
+
 
