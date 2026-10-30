@@ -187,3 +187,4 @@ def get_current_user_id() -> Optional[str]:
     if st.session_state.get("authenticated") and st.session_state.get("current_user"):
         return st.session_state.current_user.get("id")
     return None
+

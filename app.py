@@ -6,6 +6,7 @@ Built with a calm, trustworthy, and restrained healthcare design system.
 
 import sys
 from pathlib import Path
+from datetime import datetime, date, timedelta
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -56,6 +57,10 @@ from herai.database import (
     save_user_cycle_log,
     get_user_cycle_logs,
     get_next_cycle_number,
+    has_completed_onboarding,
+    validate_profile_inputs,
+    UserProfileRecord,
+    ProfileValidationError,
     UserAlreadyExistsError,
     ValidationError as DBValidationError,
 )
@@ -583,6 +588,8 @@ def render_app_header():
     """Render the top clean application header with HERAI wordmark, navigation, and user authentication state."""
     nav_col1, nav_col2, nav_col3 = st.columns([1.1, 2.1, 0.9], vertical_alignment="center")
 
+    is_auth = bool(st.session_state.get("authenticated") and st.session_state.get("current_user"))
+
     with nav_col1:
         st.markdown("""
         <div class="header-brand">
@@ -593,7 +600,11 @@ def render_app_header():
         """, unsafe_allow_html=True)
 
     with nav_col2:
-        pages = ["Dashboard", "Health Prediction", "Cycle Information", "Model Insights", "About"]
+        if is_auth:
+            pages = ["Dashboard", "Health Prediction", "Cycle Information", "Model Insights", "Profile", "About"]
+        else:
+            pages = ["Dashboard", "Health Prediction", "Cycle Information", "Model Insights", "About"]
+
         current_idx = pages.index(st.session_state.current_page) if st.session_state.current_page in pages else None
         selected = st.radio(
             "Navigation",
@@ -605,21 +616,20 @@ def render_app_header():
         )
         if selected and selected != st.session_state.current_page:
             st.session_state.current_page = selected
+            if selected == "Profile":
+                st.session_state.profile_edit_mode = False
             st.rerun()
 
     with nav_col3:
-        if st.session_state.get("authenticated") and st.session_state.get("current_user"):
+        if is_auth:
             user = st.session_state.current_user
             user_display = user.get("username", "User")
             acc_c1, acc_c2 = st.columns([1.2, 1.0], vertical_alignment="center")
             with acc_c1:
-                st.markdown(
-                    f'<div style="text-align: right; line-height: 1.2;">'
-                    f'<span class="badge-pill" style="margin-bottom: 0; font-size: 0.72rem; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block;">'
-                    f'{user_display}</span>'
-                    f'</div>',
-                    unsafe_allow_html=True
-                )
+                if st.button("My Profile", key="header_profile_btn", use_container_width=True, type="secondary"):
+                    st.session_state.current_page = "Profile"
+                    st.session_state.profile_edit_mode = False
+                    st.rerun()
             with acc_c2:
                 if st.button("Sign Out", key="header_sign_out_btn", use_container_width=True, type="secondary"):
                     logout_session_user()
@@ -670,7 +680,12 @@ def render_auth_view():
                         try:
                             user = authenticate(login_identifier.strip(), login_password)
                             login_session_user(user)
-                            st.session_state.current_page = "Dashboard"
+                            # Route returning users to Dashboard, first-time users to Onboarding
+                            if has_completed_onboarding(user.id):
+                                st.session_state.current_page = "Dashboard"
+                            else:
+                                st.session_state.current_page = "Onboarding"
+                                st.session_state.onboarding_step = 1
                             st.rerun()
                         except AuthenticationError as e:
                             st.error(str(e))
@@ -697,7 +712,12 @@ def render_auth_view():
                             full_name=reg_fullname.strip() if reg_fullname.strip() else None
                         )
                         login_session_user(user)
-                        st.session_state.current_page = "Dashboard"
+                        # New user starts guided onboarding flow
+                        st.session_state.current_page = "Onboarding"
+                        st.session_state.onboarding_step = 1
+                        st.session_state.onboarding_draft = {
+                            "preferred_name": reg_fullname.strip() if reg_fullname.strip() else reg_username.strip()
+                        }
                         st.rerun()
                     except (DBValidationError, UserAlreadyExistsError) as e:
                         st.error(str(e))
@@ -729,6 +749,640 @@ def render_auth_view():
             </p>
         </div>
         """, unsafe_allow_html=True)
+
+
+# =============================================================================
+# VIEW 0B: ONBOARDING FLOW (SECTIONS A, B, C, D)
+# =============================================================================
+def render_onboarding_flow():
+    """Render the guided 4-step first-time user onboarding wizard."""
+    user_id = get_current_user_id()
+    if not user_id:
+        st.session_state.current_page = "Sign In"
+        st.rerun()
+
+    if "onboarding_step" not in st.session_state:
+        st.session_state.onboarding_step = 1
+    if "onboarding_draft" not in st.session_state:
+        st.session_state.onboarding_draft = {}
+
+    draft = st.session_state.onboarding_draft
+    step = st.session_state.onboarding_step
+
+    st.markdown('<div class="badge-pill">Personalized Experience Setup &bull; First-Time Onboarding</div>', unsafe_allow_html=True)
+    st.markdown("<h1>Welcome to HERAI</h1>", unsafe_allow_html=True)
+    st.markdown(
+        "Let's set up your personal health profile. We collect only what is necessary to understand your patterns "
+        "and calibrate educational insights. All optional questions can be skipped and updated later."
+    )
+
+    # Multi-Step Visual Progress Stepper
+    steps_meta = [
+        (1, "Basic Profile"),
+        (2, "Cycle Baseline"),
+        (3, "Wellness Focus"),
+        (4, "Review & Confirm"),
+    ]
+    step_cols = st.columns(4)
+    for i, (s_num, s_title) in enumerate(steps_meta):
+        with step_cols[i]:
+            if step == s_num:
+                st.markdown(
+                    f'<div style="border-bottom: 3px solid var(--color-mauve); padding-bottom: 6px; font-weight: 700; color: var(--color-mauve-dark); font-size: 0.85rem;">'
+                    f'<span class="step-pill">Step {s_num}</span> {s_title}</div>',
+                    unsafe_allow_html=True
+                )
+            elif step > s_num:
+                st.markdown(
+                    f'<div style="border-bottom: 3px solid var(--color-sage); padding-bottom: 6px; color: #2D5028; font-size: 0.85rem;">'
+                    f'<span class="step-pill" style="background: #E3EDE0; color: #2D5028;">Done</span> {s_title}</div>',
+                    unsafe_allow_html=True
+                )
+            else:
+                st.markdown(
+                    f'<div style="border-bottom: 2px solid #EADCD4; padding-bottom: 6px; color: #8F7B76; font-size: 0.85rem;">'
+                    f'<span class="step-pill" style="background: #FAF5F2; color: #8F7B76;">Step {s_num}</span> {s_title}</div>',
+                    unsafe_allow_html=True
+                )
+
+    st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
+
+    # -------------------------------------------------------------------------
+    # STEP 1: SECTION A - BASIC PROFILE
+    # -------------------------------------------------------------------------
+    if step == 1:
+        st.markdown('<div class="card-surface">', unsafe_allow_html=True)
+        st.markdown('<div class="card-header-serif">Section A: Basic Profile &amp; Identity</div>', unsafe_allow_html=True)
+        st.markdown(
+            "Tell us what name you prefer to be called and your age. This information helps personalize "
+            "consultation greetings and provides physiological calibration for cycle variance analysis."
+        )
+
+        user_record = st.session_state.get("current_user") or {}
+        default_name = draft.get("preferred_name") or user_record.get("full_name") or user_record.get("username") or ""
+
+        pref_name_input = st.text_input(
+            "Preferred Name",
+            value=default_name,
+            placeholder="e.g. Maya",
+            help="What would you like HERAI to call you in notifications and consultations?"
+        )
+
+        opt_skip_age = st.checkbox(
+            "Prefer not to disclose age right now (Optional)",
+            value=(draft.get("age") is None and "age" in draft),
+            key="chk_onboarding_skip_age"
+        )
+
+        age_val = None
+        if not opt_skip_age:
+            def_age_val = int(draft.get("age", 28)) if draft.get("age") else 28
+            age_val = st.slider(
+                "Age (Years)",
+                min_value=15,
+                max_value=100,
+                value=def_age_val,
+                help="Age helps our predictive models adjust for typical age-bracket hormonal baselines."
+            )
+
+        st.markdown("""
+        <div class="callout-lavender" style="margin-top: 16px;">
+            <b>Why we request this information:</b><br>
+            Preferred name personalizes your application consultation, and baseline age helps calculate physiological variance in cycle patterns. 
+            We do not ask for or store government IDs, medical records, or sensitive personal identifiers.
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        col_next, col_skip = st.columns([1.5, 2.5], vertical_alignment="center")
+        with col_next:
+            if st.button("Continue to Cycle Information", key="btn_onb_step1_next", type="primary", use_container_width=True):
+                draft["preferred_name"] = pref_name_input.strip() if pref_name_input.strip() else None
+                draft["age"] = float(age_val) if (not opt_skip_age and age_val is not None) else None
+                st.session_state.onboarding_draft = draft
+                st.session_state.onboarding_step = 2
+                st.rerun()
+        with col_skip:
+            if st.button("Skip Setup & Explore Application", key="btn_onb_step1_skip", type="secondary"):
+                st.session_state.skip_onboarding_temp = True
+                st.session_state.current_page = "Dashboard"
+                st.rerun()
+
+    # -------------------------------------------------------------------------
+    # STEP 2: SECTION B - MENSTRUAL CYCLE INFORMATION
+    # -------------------------------------------------------------------------
+    elif step == 2:
+        st.markdown('<div class="card-surface">', unsafe_allow_html=True)
+        st.markdown('<div class="card-header-serif">Section B: Menstrual Cycle Information</div>', unsafe_allow_html=True)
+        st.markdown(
+            "Please share your general cycle observations. If you do not know specific dates or lengths, "
+            "you can skip optional fields and update them at any time."
+        )
+
+        track_opt = st.radio(
+            "Do you wish to track your menstrual cycle in HERAI?",
+            ["Yes, track my menstrual cycle", "No, focus on general wellbeing only"],
+            index=0 if draft.get("track_cycle", True) else 1,
+            key="rad_onb_track_cycle"
+        )
+        is_tracking = "Yes" in track_opt
+
+        last_date_str = None
+        clen_val = None
+        pdur_val = None
+        reg_val = "Regular"
+
+        if is_tracking:
+            st.markdown("<hr style='margin: 14px 0; border: none; border-top: 1px solid #F0E2DA;'>", unsafe_allow_html=True)
+            c_date1, c_date2 = st.columns([1.2, 1.8], vertical_alignment="center")
+            with c_date1:
+                skip_date = st.checkbox("I don't know my last period date", value=(draft.get("last_period_date") is None and "last_period_date" in draft), key="chk_skip_period_date")
+            with c_date2:
+                if not skip_date:
+                    init_date = date.today() - timedelta(days=14)
+                    if draft.get("last_period_date"):
+                        try:
+                            init_date = datetime.strptime(draft["last_period_date"], "%Y-%m-%d").date()
+                        except Exception:
+                            pass
+                    picked_date = st.date_input(
+                        "First day of most recent period",
+                        value=init_date,
+                        max_value=date.today(),
+                        min_value=date.today() - timedelta(days=365),
+                        help="The date when bleeding in your last period began."
+                    )
+                    last_date_str = picked_date.isoformat()
+
+            col_cl, col_cd = st.columns(2)
+            with col_cl:
+                skip_clen = st.checkbox("Not sure of typical cycle length", value=(draft.get("typical_cycle_length") is None and "typical_cycle_length" in draft), key="chk_skip_clen")
+                if not skip_clen:
+                    def_clen = int(draft.get("typical_cycle_length", 28)) if draft.get("typical_cycle_length") else 28
+                    clen_val = st.slider("Typical cycle length in days", 18, 60, def_clen, help="Total days from first day of period to the day before the next period starts.")
+
+            with col_cd:
+                skip_pdur = st.checkbox("Not sure of period duration", value=(draft.get("typical_period_duration") is None and "typical_period_duration" in draft), key="chk_skip_pdur")
+                if not skip_pdur:
+                    def_pdur = int(draft.get("typical_period_duration", 5)) if draft.get("typical_period_duration") else 5
+                    pdur_val = st.slider("Typical period bleeding duration in days", 1, 15, def_pdur, help="How many days bleeding usually lasts.")
+
+            reg_options = ["Regular", "Irregular", "Varied / Not Sure", "Prefer not to say"]
+            saved_reg = draft.get("cycle_regularity") or "Regular"
+            reg_idx = reg_options.index(saved_reg) if saved_reg in reg_options else 0
+            reg_val = st.selectbox(
+                "Cycle Regularity Pattern",
+                reg_options,
+                index=reg_idx,
+                help="Regular cycles generally vary by fewer than 4 days month to month."
+            )
+
+        st.markdown("""
+        <div class="callout-lavender" style="margin-top: 16px;">
+            <b>Clinical &amp; Educational Notice:</b><br>
+            Cycle observations are tracked solely for pattern recognition, historical correlation, and personal health insights. 
+            HERAI does not predict ovulation for contraception, does not assess fertility or pregnancy viability, 
+            and must never be used to guide family planning or medical intervention.
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        col_back, col_next = st.columns([1, 2])
+        with col_back:
+            if st.button("Back to Step 1", key="btn_onb_step2_back", use_container_width=True, type="secondary"):
+                st.session_state.onboarding_step = 1
+                st.rerun()
+        with col_next:
+            if st.button("Continue to Wellness Focus", key="btn_onb_step2_next", type="primary", use_container_width=True):
+                draft["track_cycle"] = is_tracking
+                draft["last_period_date"] = last_date_str if is_tracking else None
+                draft["typical_cycle_length"] = clen_val if is_tracking else None
+                draft["typical_period_duration"] = pdur_val if is_tracking else None
+                draft["cycle_regularity"] = reg_val if is_tracking else None
+                st.session_state.onboarding_draft = draft
+                st.session_state.onboarding_step = 3
+                st.rerun()
+
+    # -------------------------------------------------------------------------
+    # STEP 3: SECTION C - WELLNESS PREFERENCES
+    # -------------------------------------------------------------------------
+    elif step == 3:
+        st.markdown('<div class="card-surface">', unsafe_allow_html=True)
+        st.markdown('<div class="card-header-serif">Section C: Wellness Focus &amp; Educational Interests</div>', unsafe_allow_html=True)
+        st.markdown(
+            "Select the health and education topics you would like to explore. Your selections help personalize "
+            "recommended educational articles, lifestyle tips, and care guides."
+        )
+
+        all_topics = [
+            "Menstrual health & cycle phases",
+            "Cycle tracking & pattern discovery",
+            "PCOS/PCOD educational resources",
+            "Hormonal health & endocrine balance",
+            "Fitness, movement & recovery rhythm",
+            "Sleep resilience & stress management",
+            "Nutritional hydration & metabolic wellbeing",
+            "Pregnancy & postpartum education",
+        ]
+
+        curr_interests = set(draft.get("wellness_interests") or [])
+        selected_topics = []
+
+        t_col1, t_col2 = st.columns(2)
+        for idx, topic in enumerate(all_topics):
+            target_col = t_col1 if idx % 2 == 0 else t_col2
+            with target_col:
+                is_checked = st.checkbox(topic, value=(topic in curr_interests), key=f"chk_topic_{idx}")
+                if is_checked:
+                    selected_topics.append(topic)
+
+        st.markdown("""
+        <div class="callout-lavender" style="margin-top: 16px;">
+            <b>Educational Topic Privacy:</b><br>
+            These preferences are strictly used for personalizing educational resources and wellness tips. 
+            HERAI does not infer or diagnose any medical condition simply because you choose to explore a topic.
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        col_back, col_next = st.columns([1, 2])
+        with col_back:
+            if st.button("Back to Step 2", key="btn_onb_step3_back", use_container_width=True, type="secondary"):
+                st.session_state.onboarding_step = 2
+                st.rerun()
+        with col_next:
+            if st.button("Continue to Review & Confirm", key="btn_onb_step3_next", type="primary", use_container_width=True):
+                draft["wellness_interests"] = selected_topics
+                st.session_state.onboarding_draft = draft
+                st.session_state.onboarding_step = 4
+                st.rerun()
+
+    # -------------------------------------------------------------------------
+    # STEP 4: SECTION D - REVIEW AND SAVE
+    # -------------------------------------------------------------------------
+    elif step == 4:
+        st.markdown('<div class="card-surface">', unsafe_allow_html=True)
+        st.markdown('<div class="card-header-serif">Section D: Review &amp; Save Profile</div>', unsafe_allow_html=True)
+        st.markdown(
+            "Review your personal details below. You can update any of these settings at any time from your Profile section."
+        )
+
+        r_c1, r_c2, r_c3 = st.columns(3)
+        with r_c1:
+            st.markdown("""
+            <div style="background: #FAF7F5; border: 1px solid #ECDAD2; border-radius: 8px; padding: 14px; height: 100%;">
+                <div style="font-weight: 700; color: #59433F; font-size: 0.88rem; margin-bottom: 8px;">Basic Profile</div>
+            """, unsafe_allow_html=True)
+            p_name = draft.get("preferred_name") or "Not provided"
+            p_age = f"{int(draft['age'])} years" if draft.get("age") else "Not disclosed"
+            st.markdown(f"<b>Preferred Name:</b> {p_name}<br><b>Age:</b> {p_age}", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        with r_c2:
+            st.markdown("""
+            <div style="background: #FAF7F5; border: 1px solid #ECDAD2; border-radius: 8px; padding: 14px; height: 100%;">
+                <div style="font-weight: 700; color: #59433F; font-size: 0.88rem; margin-bottom: 8px;">Cycle Information</div>
+            """, unsafe_allow_html=True)
+            if draft.get("track_cycle", True):
+                l_date = draft.get("last_period_date") or "Not specified"
+                c_len = f"{draft['typical_cycle_length']} days" if draft.get("typical_cycle_length") else "Not specified"
+                p_dur = f"{draft['typical_period_duration']} days" if draft.get("typical_period_duration") else "Not specified"
+                c_reg = draft.get("cycle_regularity") or "Regular"
+                st.markdown(f"<b>Tracking:</b> Enabled<br><b>Last Period:</b> {l_date}<br><b>Cycle Length:</b> {c_len}<br><b>Bleeding:</b> {p_dur}<br><b>Regularity:</b> {c_reg}", unsafe_allow_html=True)
+            else:
+                st.markdown("<b>Tracking:</b> Disabled (General wellbeing mode)", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        with r_c3:
+            st.markdown("""
+            <div style="background: #FAF7F5; border: 1px solid #ECDAD2; border-radius: 8px; padding: 14px; height: 100%;">
+                <div style="font-weight: 700; color: #59433F; font-size: 0.88rem; margin-bottom: 8px;">Wellness Focus</div>
+            """, unsafe_allow_html=True)
+            interests = draft.get("wellness_interests") or []
+            if interests:
+                for item in interests:
+                    st.markdown(f"&bull; <span style='font-size: 0.83rem;'>{item}</span>", unsafe_allow_html=True)
+            else:
+                st.markdown("<span style='font-size: 0.83rem; color: #7A6560;'>No specific topics selected (general resources).</span>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown("""
+        <div class="callout-lavender" style="margin-top: 18px;">
+            <b>Local Persistent Storage Guarantee:</b><br>
+            Your information is stored in your private local SQLite database. 
+            All access is strictly isolated to your account ID. No stranger records or third-party trackers are used.
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        col_edit, col_save = st.columns([1, 2])
+        with col_edit:
+            if st.button("Edit Information (Step 1)", key="btn_onb_step4_edit", use_container_width=True, type="secondary"):
+                st.session_state.onboarding_step = 1
+                st.rerun()
+
+        with col_save:
+            if st.button("Save Profile & Finish Setup", key="btn_onb_step4_save", type="primary", use_container_width=True):
+                try:
+                    payload = dict(draft)
+                    payload["onboarding_completed"] = True
+                    save_user_profile(user_id, payload)
+                    st.session_state.onboarding_draft = {}
+                    st.session_state.onboarding_step = 1
+                    st.session_state.current_page = "Dashboard"
+                    st.success("Your personal profile has been successfully saved. Welcome to HERAI!")
+                    st.rerun()
+                except Exception as err:
+                    st.error(f"Error saving profile: {err}")
+
+
+# =============================================================================
+# VIEW 0C: PROFILE MANAGEMENT (VIEW & EDIT)
+# =============================================================================
+def render_profile_view():
+    """Render the dedicated Personal Profile Management view for viewing and editing saved details."""
+    user_id = get_current_user_id()
+    if not user_id:
+        st.markdown('<div class="badge-pill">Account Required</div>', unsafe_allow_html=True)
+        st.markdown("<h1>Personal Health Profile</h1>", unsafe_allow_html=True)
+        st.info("Please sign in or create an account to view and manage your personal profile.")
+        if st.button("Sign In / Join", key="btn_prof_guest_signin", type="primary"):
+            st.session_state.current_page = "Sign In"
+            st.rerun()
+        return
+
+    profile = get_user_profile(user_id)
+    user_record = st.session_state.get("current_user") or {}
+
+    if "profile_edit_mode" not in st.session_state:
+        st.session_state.profile_edit_mode = False
+
+    st.markdown('<div class="badge-pill">Account Settings &bull; Private Health Profile</div>', unsafe_allow_html=True)
+    st.markdown("<h1>Personal Health Profile</h1>", unsafe_allow_html=True)
+    st.markdown(
+        "Manage your personal identity, cycle tracking preferences, and wellness educational topics. "
+        "Your data is stored securely in your dedicated local database and strictly isolated to your account."
+    )
+
+    # -------------------------------------------------------------------------
+    # VIEW MODE
+    # -------------------------------------------------------------------------
+    if not st.session_state.profile_edit_mode:
+        head_c1, head_c2 = st.columns([3, 1], vertical_alignment="center")
+        with head_c1:
+            display_name = (profile.preferred_name if profile and profile.preferred_name else user_record.get("full_name") or user_record.get("username") or "User")
+            st.markdown(f"<h3 style='margin: 0; color: #59433F;'>Hello, {display_name}</h3>", unsafe_allow_html=True)
+        with head_c2:
+            if st.button("Edit Profile Information", key="btn_enter_edit_profile", type="primary", use_container_width=True):
+                st.session_state.profile_edit_mode = True
+                st.rerun()
+
+        st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+
+        card1, card2 = st.columns(2, gap="medium")
+
+        with card1:
+            st.markdown("""
+            <div class="card-surface">
+                <div class="card-header-serif">Account Identity &amp; Demographics</div>
+            """, unsafe_allow_html=True)
+            username_val = user_record.get("username", "N/A")
+            email_val = user_record.get("email", "N/A")
+            pref_name_val = profile.preferred_name if (profile and profile.preferred_name) else "Not specified"
+            age_val = f"{int(profile.age)} years" if (profile and profile.age) else "Not disclosed"
+            created_val = user_record.get("created_at", "")[:10] or "N/A"
+
+            st.markdown(f"""
+            <table style="width: 100%; font-size: 0.88rem; line-height: 1.8; color: #59433F;">
+                <tr><td style="width: 45%; color: #7A6560;">Username:</td><td><b>{username_val}</b></td></tr>
+                <tr><td style="color: #7A6560;">Email Address:</td><td><b>{email_val}</b></td></tr>
+                <tr><td style="color: #7A6560;">Preferred Name:</td><td><b>{pref_name_val}</b></td></tr>
+                <tr><td style="color: #7A6560;">Age:</td><td><b>{age_val}</b></td></tr>
+                <tr><td style="color: #7A6560;">Account Created:</td><td>{created_val}</td></tr>
+                <tr><td style="color: #7A6560;">Onboarding Status:</td><td><span class="tier-badge-optimal" style="font-size: 0.76rem; padding: 2px 8px;">Completed</span></td></tr>
+            </table>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with card2:
+            st.markdown("""
+            <div class="card-surface">
+                <div class="card-header-serif">Menstrual Cycle Baseline</div>
+            """, unsafe_allow_html=True)
+            if profile and profile.track_cycle:
+                l_date = profile.last_period_date or "Not logged"
+                c_len = f"{profile.typical_cycle_length} days" if profile.typical_cycle_length else "Not set"
+                p_dur = f"{profile.typical_period_duration} days" if profile.typical_period_duration else "Not set"
+                reg_val = profile.cycle_regularity or "Regular"
+                st.markdown(f"""
+                <table style="width: 100%; font-size: 0.88rem; line-height: 1.8; color: #59433F;">
+                    <tr><td style="width: 45%; color: #7A6560;">Cycle Tracking:</td><td><span class="tier-badge-optimal" style="font-size: 0.76rem; padding: 2px 8px;">Active</span></td></tr>
+                    <tr><td style="color: #7A6560;">Last Period Date:</td><td><b>{l_date}</b></td></tr>
+                    <tr><td style="color: #7A6560;">Typical Cycle Length:</td><td><b>{c_len}</b></td></tr>
+                    <tr><td style="color: #7A6560;">Typical Period Duration:</td><td><b>{p_dur}</b></td></tr>
+                    <tr><td style="color: #7A6560;">Cycle Regularity:</td><td><b>{reg_val}</b></td></tr>
+                </table>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("""
+                <p style="font-size: 0.88rem; color: #7A6560; line-height: 1.6;">
+                    Cycle tracking is currently disabled. HERAI is running in general wellness mode.
+                </p>
+                """, unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
+        card3, card4 = st.columns(2, gap="medium")
+
+        with card3:
+            st.markdown("""
+            <div class="card-surface">
+                <div class="card-header-serif">Wellness &amp; Educational Focus</div>
+            """, unsafe_allow_html=True)
+            interests = profile.wellness_interests if profile else []
+            if interests:
+                st.markdown("<div style='display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;'>", unsafe_allow_html=True)
+                for item in interests:
+                    st.markdown(f"<span class='badge-pill' style='font-size: 0.78rem; text-transform: none; margin-bottom: 4px;'>{item}</span>", unsafe_allow_html=True)
+                st.markdown("</div>", unsafe_allow_html=True)
+            else:
+                st.markdown("<p style='font-size: 0.86rem; color: #7A6560;'>No specific wellness topics selected yet. Click 'Edit Profile Information' to choose topics of interest.</p>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        with card4:
+            st.markdown("""
+            <div class="card-surface">
+                <div class="card-header-serif">Lifestyle &amp; Clinical Baseline</div>
+            """, unsafe_allow_html=True)
+            if profile and (profile.sleep_hours is not None or profile.stress_score_baseline is not None or profile.bmi is not None):
+                b_sleep = f"{profile.sleep_hours:.1f} hrs" if profile.sleep_hours is not None else "Not set"
+                b_stress = f"{profile.stress_score_baseline:.1f} / 10" if profile.stress_score_baseline is not None else "Not set"
+                b_bmi = f"{profile.bmi:.1f}" if profile.bmi is not None else "Not set"
+                b_diet = profile.diet_quality or "Not set"
+                b_exer = profile.exercise_frequency or "Not set"
+                st.markdown(f"""
+                <table style="width: 100%; font-size: 0.88rem; line-height: 1.8; color: #59433F;">
+                    <tr><td style="width: 45%; color: #7A6560;">Daily Sleep:</td><td><b>{b_sleep}</b></td></tr>
+                    <tr><td style="color: #7A6560;">Baseline Stress:</td><td><b>{b_stress}</b></td></tr>
+                    <tr><td style="color: #7A6560;">BMI:</td><td><b>{b_bmi}</b></td></tr>
+                    <tr><td style="color: #7A6560;">Diet Quality:</td><td><b>{b_diet}</b></td></tr>
+                    <tr><td style="color: #7A6560;">Exercise Frequency:</td><td><b>{b_exer}</b></td></tr>
+                </table>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("<p style='font-size: 0.86rem; color: #7A6560;'>No baseline lifestyle biomarkers saved yet. These are automatically recorded when you consult the prediction model or edit your profile.</p>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+    # -------------------------------------------------------------------------
+    # EDIT MODE
+    # -------------------------------------------------------------------------
+    else:
+        st.markdown('<div class="badge-pill">Edit Mode</div>', unsafe_allow_html=True)
+        st.markdown("<h3>Edit Your Profile Information</h3>", unsafe_allow_html=True)
+        st.markdown("Update your personal details below. Changes are saved directly to your private local database.")
+
+        edit_tab1, edit_tab2, edit_tab3, edit_tab4 = st.tabs([
+            "Identity & Demographics",
+            "Cycle Preferences",
+            "Wellness Topics",
+            "Lifestyle Baseline",
+        ])
+
+        with edit_tab1:
+            st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+            curr_pname = profile.preferred_name if (profile and profile.preferred_name) else user_record.get("full_name") or ""
+            edit_pname = st.text_input("Preferred Name", value=curr_pname, key="edit_input_pname")
+
+            curr_has_age = bool(profile and profile.age is not None)
+            edit_skip_age = st.checkbox("Prefer not to specify age", value=(not curr_has_age), key="edit_chk_skip_age")
+            edit_age = None
+            if not edit_skip_age:
+                def_age_int = int(profile.age) if curr_has_age else 28
+                edit_age = st.slider("Age (Years)", 15, 100, def_age_int, key="edit_input_age")
+
+        with edit_tab2:
+            st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+            curr_tracking = profile.track_cycle if profile else True
+            edit_tracking = st.checkbox("Enable Menstrual Cycle Tracking", value=curr_tracking, key="edit_chk_tracking")
+
+            edit_last_date_str = None
+            edit_clen = None
+            edit_pdur = None
+            edit_reg = "Regular"
+
+            if edit_tracking:
+                has_last_date = bool(profile and profile.last_period_date)
+                edit_skip_date = st.checkbox("Date of last period unknown", value=(not has_last_date), key="edit_chk_skip_date")
+                if not edit_skip_date:
+                    init_dt = date.today() - timedelta(days=14)
+                    if has_last_date:
+                        try:
+                            init_dt = datetime.strptime(profile.last_period_date, "%Y-%m-%d").date()
+                        except Exception:
+                            pass
+                    dt_pick = st.date_input(
+                        "First day of most recent period",
+                        value=init_dt,
+                        max_value=date.today(),
+                        min_value=date.today() - timedelta(days=365),
+                        key="edit_input_date"
+                    )
+                    edit_last_date_str = dt_pick.isoformat()
+
+                c_cl, c_pd = st.columns(2)
+                with c_cl:
+                    has_clen = bool(profile and profile.typical_cycle_length)
+                    edit_skip_clen = st.checkbox("Not sure of typical cycle length", value=(not has_clen), key="edit_chk_skip_clen")
+                    if not edit_skip_clen:
+                        clen_def = int(profile.typical_cycle_length) if has_clen else 28
+                        edit_clen = st.slider("Typical cycle length in days", 18, 60, clen_def, key="edit_input_clen")
+
+                with c_pd:
+                    has_pdur = bool(profile and profile.typical_period_duration)
+                    edit_skip_pdur = st.checkbox("Not sure of typical period duration", value=(not has_pdur), key="edit_chk_skip_pdur")
+                    if not edit_skip_pdur:
+                        pdur_def = int(profile.typical_period_duration) if has_pdur else 5
+                        edit_pdur = st.slider("Typical period bleeding duration in days", 1, 15, pdur_def, key="edit_input_pdur")
+
+                reg_opts = ["Regular", "Irregular", "Varied / Not Sure", "Prefer not to say"]
+                curr_reg = profile.cycle_regularity if (profile and profile.cycle_regularity) else "Regular"
+                r_idx = reg_opts.index(curr_reg) if curr_reg in reg_opts else 0
+                edit_reg = st.selectbox("Cycle Regularity Pattern", reg_opts, index=r_idx, key="edit_input_reg")
+
+        with edit_tab3:
+            st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+            all_topics = [
+                "Menstrual health & cycle phases",
+                "Cycle tracking & pattern discovery",
+                "PCOS/PCOD educational resources",
+                "Hormonal health & endocrine balance",
+                "Fitness, movement & recovery rhythm",
+                "Sleep resilience & stress management",
+                "Nutritional hydration & metabolic wellbeing",
+                "Pregnancy & postpartum education",
+            ]
+            saved_interests = set(profile.wellness_interests if profile else [])
+            edit_selected_topics = []
+            e_t1, e_t2 = st.columns(2)
+            for idx, top in enumerate(all_topics):
+                target_col = e_t1 if idx % 2 == 0 else e_t2
+                with target_col:
+                    ch = st.checkbox(top, value=(top in saved_interests), key=f"edit_top_{idx}")
+                    if ch:
+                        edit_selected_topics.append(top)
+
+        with edit_tab4:
+            st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+            e_b1, e_b2 = st.columns(2)
+            with e_b1:
+                def_sleep = float(profile.sleep_hours) if (profile and profile.sleep_hours is not None) else 7.5
+                edit_sleep = st.slider("Baseline Daily Sleep (Hours)", 4.0, 12.0, def_sleep, step=0.5, key="edit_input_sleep")
+                def_stress = float(profile.stress_score_baseline) if (profile and profile.stress_score_baseline is not None) else 4.0
+                edit_stress = st.slider("Baseline Stress Score (0–10)", 0.0, 10.0, def_stress, step=0.5, key="edit_input_stress")
+            with e_b2:
+                def_bmi = float(profile.bmi) if (profile and profile.bmi is not None) else 22.5
+                edit_bmi = st.slider("BMI (Body Mass Index)", 15.0, 45.0, def_bmi, step=0.1, key="edit_input_bmi")
+                diet_opts = ["Good", "Fair", "Poor", "Excellent"]
+                curr_diet = profile.diet_quality if (profile and profile.diet_quality in diet_opts) else "Good"
+                edit_diet = st.selectbox("Diet Quality", diet_opts, index=diet_opts.index(curr_diet), key="edit_input_diet")
+
+        st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
+        btn_c1, btn_c2 = st.columns([1.5, 1.5])
+        with btn_c1:
+            if st.button("Save Profile Changes", key="btn_save_profile_edits", type="primary", use_container_width=True):
+                update_payload = {
+                    "preferred_name": edit_pname.strip() if edit_pname.strip() else None,
+                    "age": float(edit_age) if (not edit_skip_age and edit_age is not None) else None,
+                    "track_cycle": edit_tracking,
+                    "last_period_date": edit_last_date_str if edit_tracking else None,
+                    "typical_cycle_length": edit_clen if edit_tracking else None,
+                    "typical_period_duration": edit_pdur if edit_tracking else None,
+                    "cycle_regularity": edit_reg if edit_tracking else None,
+                    "wellness_interests": edit_selected_topics,
+                    "sleep_hours": edit_sleep,
+                    "stress_score_baseline": edit_stress,
+                    "bmi": edit_bmi,
+                    "diet_quality": edit_diet,
+                    "onboarding_completed": True,
+                }
+                try:
+                    save_user_profile(user_id, update_payload)
+                    st.session_state.profile_edit_mode = False
+                    st.success("Your profile has been successfully updated.")
+                    st.rerun()
+                except ProfileValidationError as e:
+                    st.error(str(e))
+                except Exception as e:
+                    st.error(f"Error updating profile: {e}")
+
+        with btn_c2:
+            if st.button("Cancel Editing", key="btn_cancel_profile_edits", type="secondary", use_container_width=True):
+                st.session_state.profile_edit_mode = False
+                st.rerun()
 
 
 # =============================================================================
@@ -989,7 +1643,8 @@ def render_health_prediction(predictor: HerAIPredictor):
             def_caffeine, def_water = 1.5, 2.0
             def_smoke, def_alcohol, def_state = "Non-smoker", "None", "California"
 
-        def_clen, def_phase, def_flow, def_pain = 28, "Menstrual", "Medium", 3
+        def_clen = int(saved_profile.typical_cycle_length) if (saved_profile and saved_profile.typical_cycle_length) else 28
+        def_phase, def_flow, def_pain = "Menstrual", "Medium", 3
         def_mood, def_stress, def_sleep = 7, 4.0, 7.5
         def_energy, def_focus, def_lost = 7, 7, 0.0
 
@@ -1953,7 +2608,17 @@ def main():
     predictor = get_predictor()
     cohort_df = get_cohort_dataset()
 
-    if st.session_state.current_page == "Sign In":
+    user_id = get_current_user_id()
+    # Personalization rule: First-time user onboarding redirect
+    if user_id and not has_completed_onboarding(user_id):
+        if not st.session_state.get("skip_onboarding_temp") and st.session_state.current_page not in ["About", "Sign In"]:
+            st.session_state.current_page = "Onboarding"
+
+    if st.session_state.current_page == "Onboarding":
+        render_onboarding_flow()
+    elif st.session_state.current_page == "Profile":
+        render_profile_view()
+    elif st.session_state.current_page == "Sign In":
         render_auth_view()
     elif st.session_state.current_page == "Dashboard":
         render_dashboard(cohort_df)

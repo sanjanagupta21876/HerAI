@@ -473,7 +473,203 @@ def test_app_imports_and_handlers():
         sys.path.insert(0, str(ROOT))
     import app
     assert hasattr(app, "render_auth_view")
+    assert hasattr(app, "render_onboarding_flow")
+    assert hasattr(app, "render_profile_view")
     assert hasattr(app, "render_app_header")
     assert hasattr(app, "render_dashboard")
     assert hasattr(app, "render_health_prediction")
     assert hasattr(app, "get_predictor")
+
+
+# =============================================================================
+# 10. PHASE 2: ONBOARDING AND PROFILE MANAGEMENT TESTS
+# =============================================================================
+def test_phase2_onboarding_and_profile_persistence(temp_db):
+    """Verify Section 1 & 3: New user completes onboarding, profile is saved, and onboarding status is set."""
+    from herai.database import has_completed_onboarding, UserProfileRecord
+
+    user = register_user("elena_health", "elena@example.com", "Password123!", "Password123!", "Elena Gilbert", db_path=temp_db)
+    assert has_completed_onboarding(user.id, db_path=temp_db) is False
+
+    onboarding_data = {
+        "preferred_name": "Elena",
+        "age": 27.0,
+        "track_cycle": True,
+        "last_period_date": "2026-10-15",
+        "typical_cycle_length": 29,
+        "typical_period_duration": 5,
+        "cycle_regularity": "Regular",
+        "wellness_interests": ["Menstrual health", "PCOS/PCOD education", "Hormonal health education"],
+        "onboarding_completed": True,
+    }
+
+    success = save_user_profile(user.id, onboarding_data, db_path=temp_db)
+    assert success is True
+    assert has_completed_onboarding(user.id, db_path=temp_db) is True
+
+    profile = get_user_profile(user.id, db_path=temp_db)
+    assert isinstance(profile, UserProfileRecord)
+    assert profile.preferred_name == "Elena"
+    assert profile.age == 27.0
+    assert profile.track_cycle is True
+    assert profile.last_period_date == "2026-10-15"
+    assert profile.typical_cycle_length == 29
+    assert profile.typical_period_duration == 5
+    assert profile.cycle_regularity == "Regular"
+    assert "Menstrual health" in profile.wellness_interests
+    assert "PCOS/PCOD education" in profile.wellness_interests
+    assert profile.onboarding_completed is True
+
+
+def test_phase2_profile_partial_update_preserves_existing_data(temp_db):
+    """Verify Section 2: Editing preferred name or interests does not wipe out previously saved cycle fields."""
+    user = register_user("update_test", "update@example.com", "UpdatePass1", "UpdatePass1", db_path=temp_db)
+
+    # Initial onboarding save
+    save_user_profile(
+        user.id,
+        {
+            "preferred_name": "Initial Name",
+            "age": 28.0,
+            "typical_cycle_length": 30,
+            "typical_period_duration": 4,
+            "cycle_regularity": "Regular",
+            "wellness_interests": ["Fitness and general wellbeing"],
+            "onboarding_completed": True,
+        },
+        db_path=temp_db
+    )
+
+    # Partial edit: User changes only preferred_name and wellness_interests
+    save_user_profile(
+        user.id,
+        {
+            "preferred_name": "Updated Name",
+            "wellness_interests": ["Fitness and general wellbeing", "Sleep and stress resilience"],
+        },
+        db_path=temp_db
+    )
+
+    updated_profile = get_user_profile(user.id, db_path=temp_db)
+    assert updated_profile.preferred_name == "Updated Name"
+    # Previously saved fields MUST remain intact
+    assert updated_profile.age == 28.0
+    assert updated_profile.typical_cycle_length == 30
+    assert updated_profile.typical_period_duration == 4
+    assert updated_profile.cycle_regularity == "Regular"
+    assert len(updated_profile.wellness_interests) == 2
+
+
+def test_phase2_profile_validation_rejects_invalid_inputs(temp_db):
+    """Verify Section 6: Input validation catches invalid dates, out-of-range cycle lengths, and bad numbers."""
+    from herai.database import ProfileValidationError
+    from datetime import date, timedelta
+
+    user = register_user("val_test", "val@example.com", "ValPass123", "ValPass123", db_path=temp_db)
+
+    # 1. Future period date rejected
+    future_date = (date.today() + timedelta(days=2)).isoformat()
+    with pytest.raises(ProfileValidationError) as exc:
+        save_user_profile(user.id, {"last_period_date": future_date}, db_path=temp_db)
+    assert "future" in str(exc.value).lower()
+
+    # 2. Age out of bounds (< 15 or > 100)
+    with pytest.raises(ProfileValidationError) as exc:
+        save_user_profile(user.id, {"age": 12}, db_path=temp_db)
+    assert "age" in str(exc.value).lower()
+
+    with pytest.raises(ProfileValidationError) as exc:
+        save_user_profile(user.id, {"age": 115}, db_path=temp_db)
+    assert "age" in str(exc.value).lower()
+
+    # 3. Typical cycle length out of bounds (< 18 or > 60)
+    with pytest.raises(ProfileValidationError) as exc:
+        save_user_profile(user.id, {"typical_cycle_length": 12}, db_path=temp_db)
+    assert "cycle length" in str(exc.value).lower()
+
+    with pytest.raises(ProfileValidationError) as exc:
+        save_user_profile(user.id, {"typical_cycle_length": 75}, db_path=temp_db)
+    assert "cycle length" in str(exc.value).lower()
+
+    # 4. Period duration out of bounds (< 1 or > 15)
+    with pytest.raises(ProfileValidationError) as exc:
+        save_user_profile(user.id, {"typical_period_duration": 25}, db_path=temp_db)
+    assert "period duration" in str(exc.value).lower()
+
+    # 5. Invalid cycle regularity category
+    with pytest.raises(ProfileValidationError) as exc:
+        save_user_profile(user.id, {"cycle_regularity": "Completely Chaotic"}, db_path=temp_db)
+    assert "regularity" in str(exc.value).lower()
+
+
+def test_phase2_multi_user_profile_isolation(temp_db):
+    """Verify Section 3 & 4: Two users have strictly separated profiles; user A cannot view or corrupt user B's profile."""
+    user1 = register_user("user_maya", "maya@wellness.org", "MayaPass123", "MayaPass123", "Maya Lin", db_path=temp_db)
+    user2 = register_user("user_sarah", "sarah@wellness.org", "SarahPass123", "SarahPass123", "Sarah Connor", db_path=temp_db)
+
+    save_user_profile(
+        user1.id,
+        {
+            "preferred_name": "Maya",
+            "age": 29.0,
+            "typical_cycle_length": 28,
+            "wellness_interests": ["Cycle tracking", "Menstrual health"],
+            "onboarding_completed": True,
+        },
+        db_path=temp_db
+    )
+
+    save_user_profile(
+        user2.id,
+        {
+            "preferred_name": "Sarah",
+            "age": 34.0,
+            "typical_cycle_length": 35,
+            "wellness_interests": ["PCOS/PCOD education", "Hormonal health education"],
+            "onboarding_completed": True,
+        },
+        db_path=temp_db
+    )
+
+    # User 1 profile inspection
+    prof1 = get_user_profile(user1.id, db_path=temp_db)
+    assert prof1.preferred_name == "Maya"
+    assert prof1.age == 29.0
+    assert prof1.typical_cycle_length == 28
+    assert "Cycle tracking" in prof1.wellness_interests
+    assert "PCOS/PCOD education" not in prof1.wellness_interests
+
+    # User 2 profile inspection
+    prof2 = get_user_profile(user2.id, db_path=temp_db)
+    assert prof2.preferred_name == "Sarah"
+    assert prof2.age == 34.0
+    assert prof2.typical_cycle_length == 35
+    assert "PCOS/PCOD education" in prof2.wellness_interests
+    assert "Cycle tracking" not in prof2.wellness_interests
+
+
+def test_phase2_missing_optional_profile_fields_permitted(temp_db):
+    """Verify Section 4 & 6: Missing optional information does not prevent saving or accessing the profile."""
+    from herai.database import has_completed_onboarding
+
+    user = register_user("opt_user", "opt@example.com", "Optional123", "Optional123", db_path=temp_db)
+
+    # User provides only preferred_name and track_cycle=False, omitting age, dates, cycle lengths, etc.
+    save_user_profile(
+        user.id,
+        {
+            "preferred_name": "Alex",
+            "track_cycle": False,
+            "onboarding_completed": True,
+        },
+        db_path=temp_db
+    )
+
+    assert has_completed_onboarding(user.id, db_path=temp_db) is True
+    prof = get_user_profile(user.id, db_path=temp_db)
+    assert prof.preferred_name == "Alex"
+    assert prof.track_cycle is False
+    assert prof.age is None
+    assert prof.last_period_date is None
+    assert prof.typical_cycle_length is None
+    assert prof.wellness_interests == []
